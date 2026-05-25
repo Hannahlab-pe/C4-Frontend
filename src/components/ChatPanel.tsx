@@ -12,6 +12,7 @@ interface ChatMensaje {
   rol: 'user' | 'assistant' | 'pdf'
   contenido: string
   streaming?: boolean
+  adjunto?: { nombre: string; tipo: string; base64: string }
 }
 
 interface Props {
@@ -108,10 +109,11 @@ export default function ChatPanel({ proyectoId, onClose }: Props) {
 
     const userId = Date.now()
     const assistantId = userId + 1
+    const adjuntoSnapshot = archivo ?? undefined
 
     setMensajes((prev) => [
       ...prev,
-      { id: userId, rol: 'user', contenido: userMsg },
+      { id: userId, rol: 'user', contenido: userMsg, adjunto: adjuntoSnapshot },
       { id: assistantId, rol: 'assistant', contenido: '', streaming: true },
     ])
 
@@ -282,7 +284,23 @@ export default function ChatPanel({ proyectoId, onClose }: Props) {
                 : 'bg-white border border-slate-200 text-slate-700 rounded-bl-sm shadow-sm'
             }`}>
               {msg.rol === 'user' ? (
-                <span className="whitespace-pre-wrap">{msg.contenido}</span>
+                <div className="space-y-2">
+                  {msg.adjunto && (
+                    msg.adjunto.tipo.startsWith('image/') ? (
+                      <img
+                        src={`data:${msg.adjunto.tipo};base64,${msg.adjunto.base64}`}
+                        alt={msg.adjunto.nombre}
+                        className="max-w-50 rounded-xl block"
+                      />
+                    ) : (
+                      <div className="flex items-center gap-1.5 bg-blue-500/30 rounded-lg px-2 py-1">
+                        <FileText className="w-3 h-3 shrink-0" />
+                        <span className="text-xs truncate max-w-40">{msg.adjunto.nombre}</span>
+                      </div>
+                    )
+                  )}
+                  {msg.contenido && <span className="whitespace-pre-wrap">{msg.contenido}</span>}
+                </div>
               ) : msg.contenido ? (
                 <ReactMarkdown
                   components={{
@@ -354,7 +372,7 @@ export default function ChatPanel({ proyectoId, onClose }: Props) {
           <div className="flex items-center gap-2 mb-2">
             <div className="flex items-center gap-1.5 bg-blue-50 border border-blue-200 text-blue-700 text-xs font-medium px-2.5 py-1 rounded-lg">
               <FileText className="w-3 h-3 shrink-0" />
-              <span className="max-w-[200px] truncate">{archivo.nombre}</span>
+              <span className="max-w-50 truncate">{archivo.nombre}</span>
               <button onClick={() => setArchivo(null)} className="text-blue-400 hover:text-blue-600 ml-1">
                 <X className="w-3 h-3" />
               </button>
