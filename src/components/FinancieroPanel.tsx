@@ -1,6 +1,6 @@
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, ReferenceLine, Cell,
+  Tooltip, ResponsiveContainer, ReferenceLine,
 } from 'recharts'
 
 interface FlujoMes {
@@ -97,7 +97,7 @@ export default function FinancieroPanel({ financiero: f }: Props) {
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
               <XAxis dataKey="mes" tick={{ fontSize: 10 }} label={{ value: 'Mes', position: 'insideBottom', offset: -2, fontSize: 10 }} />
               <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => fmt(v)} width={52} />
-              <Tooltip formatter={(v: number) => fmtTooltip(v)} labelFormatter={(l) => `Mes ${l}`} />
+              <Tooltip formatter={(v) => fmtTooltip(v as number)} labelFormatter={(l) => `Mes ${l}`} />
               <ReferenceLine y={0} stroke="#94a3b8" strokeDasharray="4 4" />
               <Area
                 type="monotone"
@@ -122,7 +122,7 @@ export default function FinancieroPanel({ financiero: f }: Props) {
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
               <XAxis dataKey="mes" tick={{ fontSize: 9 }} />
               <YAxis tick={{ fontSize: 9 }} tickFormatter={(v) => fmt(v)} width={52} />
-              <Tooltip formatter={(v: number) => fmtTooltip(v)} labelFormatter={(l) => `Mes ${l}`} />
+              <Tooltip formatter={(v) => fmtTooltip(v as number)} labelFormatter={(l) => `Mes ${l}`} />
               <Bar dataKey="ingresos" fill="#3b82f6" name="Ingresos" radius={[2, 2, 0, 0]} />
               <Bar dataKey="egresos" fill="#f87171" name="Egresos" radius={[2, 2, 0, 0]} />
             </BarChart>
