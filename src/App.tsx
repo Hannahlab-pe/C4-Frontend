@@ -6,6 +6,7 @@ import DashboardPage from './pages/DashboardPage'
 import ProyectosPage from './pages/ProyectosPage'
 import ProyectoPanelPage from './pages/ProyectoPanelPage'
 import ProyectoFasePage from './pages/ProyectoFasePage'
+import ExcavacionPage from './pages/ExcavacionPage'
 import AnalisisPage from './pages/AnalisisPage'
 import KnowledgeBasePage from './pages/KnowledgeBasePage'
 import { useAuthStore } from './store/authStore'
@@ -36,6 +37,7 @@ export default function App() {
         <Route path="proyectos/:id/panel" element={<ProyectoPanelLayout />}>
           <Route index element={<ProyectoPanelPage />} />
           <Route path="analisis" element={<AnalisisPage />} />
+          <Route path="excavacion" element={<ExcavacionPage />} />
           <Route path=":fase" element={<ProyectoFasePage />} />
         </Route>
 
