@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Plus, Search, MapPin, HardHat, Sparkles, ChevronRight, X, Loader2 } from 'lucide-react'
+import { Plus, Search, MapPin, HardHat, Sparkles, ChevronRight, Loader2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import api from '../lib/api'
+import AppDialog from '../components/AppDialog'
 
 interface Proyecto {
   id: string
@@ -128,65 +129,51 @@ export default function ProyectosPage() {
       </div>
 
       {/* Modal */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowModal(false)} />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-base font-semibold text-slate-800">Nuevo proyecto</h2>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1.5">
-                  Nombre del proyecto <span className="text-red-400">*</span>
-                </label>
-                <input
-                  autoFocus
-                  value={nombre}
-                  onChange={(e) => setNombre(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && crearProyecto()}
-                  placeholder="Ej: Edificio Multifamiliar — San Isidro"
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1.5">
-                  Distrito <span className="text-slate-400 font-normal">(opcional)</span>
-                </label>
-                <input
-                  value={distrito}
-                  onChange={(e) => setDistrito(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && crearProyecto()}
-                  placeholder="Ej: Miraflores"
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => setShowModal(false)}
-                className="flex-1 border border-slate-200 text-slate-600 text-sm font-medium py-2.5 rounded-xl hover:bg-slate-50 transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={crearProyecto}
-                disabled={!nombre.trim() || creando}
-                className="flex-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-sm font-medium py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2"
-              >
-                {creando && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                Crear y abrir
-              </button>
-            </div>
+      <AppDialog open={showModal} onClose={() => setShowModal(false)} title="Nuevo proyecto">
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1.5">
+              Nombre del proyecto <span className="text-red-400">*</span>
+            </label>
+            <input
+              autoFocus
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && crearProyecto()}
+              placeholder="Ej: Edificio Multifamiliar — San Isidro"
+              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1.5">
+              Distrito <span className="text-slate-400 font-normal">(opcional)</span>
+            </label>
+            <input
+              value={distrito}
+              onChange={(e) => setDistrito(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && crearProyecto()}
+              placeholder="Ej: Miraflores"
+              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
+            />
           </div>
         </div>
-      )}
+        <div className="flex gap-3 mt-6">
+          <button
+            onClick={() => setShowModal(false)}
+            className="flex-1 border border-slate-200 text-slate-600 text-sm font-medium py-2.5 rounded-xl hover:bg-slate-50 transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={crearProyecto}
+            disabled={!nombre.trim() || creando}
+            className="flex-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-sm font-medium py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2"
+          >
+            {creando && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            Crear y abrir
+          </button>
+        </div>
+      </AppDialog>
     </div>
   )
 }

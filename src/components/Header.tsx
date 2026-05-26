@@ -1,17 +1,35 @@
 import { Bell, Search } from 'lucide-react'
 import { useLocation } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import api from '../lib/api'
 
-const titles: Record<string, string> = {
-  '/dashboard': 'Dashboard',
-  '/proyectos': 'Proyectos',
+const STATIC_TITLES: Record<string, string> = {
+  '/dashboard':        'Dashboard',
+  '/base-conocimiento': 'Base de Conocimiento',
 }
 
 export default function Header() {
   const { pathname } = useLocation()
+  const [proyectoNombre, setProyectoNombre] = useState<string | null>(null)
 
-  const title =
-    Object.entries(titles).find(([path]) => pathname.startsWith(path))?.[1] ??
-    'C4'
+  const proyectoIdMatch = pathname.match(/^\/proyectos\/([^/]+)/)
+  const proyectoId = proyectoIdMatch?.[1]
+
+  useEffect(() => {
+    if (!proyectoId) { setProyectoNombre(null); return }
+    api.get(`/proyectos/${proyectoId}`)
+      .then(r => setProyectoNombre(r.data.nombre))
+      .catch(() => setProyectoNombre(null))
+  }, [proyectoId])
+
+  let title = 'C4'
+  if (proyectoId) {
+    title = proyectoNombre ? `Proyecto · ${proyectoNombre}` : 'Proyecto'
+  } else {
+    const staticMatch = Object.entries(STATIC_TITLES).find(([path]) => pathname.startsWith(path))
+    if (staticMatch) title = staticMatch[1]
+    else if (pathname.startsWith('/proyectos')) title = 'Proyectos'
+  }
 
   return (
     <header className="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-6 shrink-0">

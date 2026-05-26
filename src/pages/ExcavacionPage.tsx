@@ -2,17 +2,30 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import {
   HardHat, FileText, Truck, DollarSign, BarChart2,
-  Plus, Trash2, Pencil, CheckCircle2, Clock, Circle,
-  Loader2, X, Phone, Wrench, AlertCircle,
+  Plus, Trash2, Phone, Wrench, AlertCircle, Loader2,
+  MapPin, Calendar, User, Layers, ChevronRight,
+  ClipboardList, Settings2, Globe, CalendarDays, Activity,
+  type LucideIcon,
 } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 import { API_BASE } from '../lib/config'
+import AppDialog from '../components/AppDialog'
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
-interface Tarea {
-  id: string; texto: string; estado: 'pendiente' | 'en_proceso' | 'completada'
+interface ExcavacionReg {
+  id: string
+  nombre: string
+  areaTotalM2: number; profundidadTotalM: number; volumenTotalM3: number
+  longitudTotalM: number; anchoPromedioM: number; cotaReferenciaMsnm: number
+  tipoExcavacion: string; clasificacionTerreno: string
+  metodoExcavacion: string; turnoTrabajo: string
+  nivelFreatico: number; coordUtmNorte: number; coordUtmEste: number; pendienteNatural: number
+  fechaInicio: string; fechaFinEstimada: string; duracionEstimadaDias: number
+  ingenieroResponsable: string; residenteObra: string; supervisorSeguridad: string
+  estado: string; observaciones: string
 }
+
 interface Contrata {
   id: string; empresa: string; tipo: string; servicios: string[]; equipos: string[]
   presupuestoTotal: number; presupuestoAsignado: number
@@ -25,7 +38,25 @@ interface Equipo {
   horasTrabajadas: number; mantenimientoEstado: string; notas: string
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Opciones de selects ──────────────────────────────────────────────────────
+
+const TIPOS_EXCAVACION = [
+  'Zanja', 'Masiva a Cielo Abierto', 'Puntual / Apique', 'Talud', 'Subterránea / Túnel',
+]
+const CLASIFICACIONES_TERRENO = [
+  'Roca Dura', 'Roca Blanda', 'Suelo Cohesivo Duro', 'Suelo Cohesivo Blando',
+  'Suelo Granular Grueso', 'Suelo Granular Fino', 'Material Orgánico',
+]
+const METODOS_EXCAVACION = [
+  'Excavadora Hidráulica', 'Retroexcavadora', 'Perfiladora / Zanjadora',
+  'Manual', 'Mixto (Mecánico + Manual)', 'Explosivos',
+]
+const TURNOS_TRABAJO = [
+  'Diurno (6am-6pm)', 'Nocturno (6pm-6am)', 'Continuo (24h)', 'Doble Turno',
+]
+const ESTADOS_EXCAVACION = [
+  'Planificada', 'En Progreso', 'Pausada', 'Completada', 'Cancelada',
+]
 
 const TABS = [
   { key: 'excavaciones', label: 'Excavaciones', icon: HardHat },
@@ -41,7 +72,6 @@ const TIPOS_CONTRATA = [
   { value: 'transporte',             label: 'Transporte' },
   { value: 'otro',                   label: 'Otro' },
 ]
-
 const TIPOS_EQUIPO = [
   { value: 'excavadora',      label: 'Excavadora' },
   { value: 'mini_excavadora', label: 'Mini Excavadora' },
@@ -50,8 +80,30 @@ const TIPOS_EQUIPO = [
   { value: 'otro',            label: 'Otro' },
 ]
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
 function fmtSoles(n: number) {
   return `S/ ${Number(n).toLocaleString('es-PE', { maximumFractionDigits: 0 })}`
+}
+
+function fmtNum(n: number | undefined, dec = 2) {
+  if (!n && n !== 0) return '—'
+  return Number(n).toLocaleString('es-PE', { maximumFractionDigits: dec })
+}
+
+function estadoExcBadge(estado: string) {
+  const map: Record<string, string> = {
+    'Planificada':  'bg-slate-100 text-slate-600',
+    'En Progreso':  'bg-orange-100 text-orange-700',
+    'Pausada':      'bg-amber-100 text-amber-700',
+    'Completada':   'bg-green-100 text-green-700',
+    'Cancelada':    'bg-red-100 text-red-600',
+  }
+  return (
+    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${map[estado] ?? 'bg-slate-100 text-slate-500'}`}>
+      {estado}
+    </span>
+  )
 }
 
 function estadoBadge(estado: string) {
@@ -73,48 +125,47 @@ function estadoBadge(estado: string) {
 
 function equipoEstadoBadge(estado: string) {
   const map: Record<string, string> = {
-    operativo:    'bg-green-100 text-green-700',
-    mantenimiento:'bg-red-100 text-red-600',
-    disponible:   'bg-blue-100 text-blue-700',
-  }
-  const labels: Record<string, string> = {
-    operativo: 'Operativo', mantenimiento: 'Mantenimiento', disponible: 'Disponible',
+    operativo:     'bg-green-100 text-green-700',
+    mantenimiento: 'bg-red-100 text-red-600',
+    disponible:    'bg-blue-100 text-blue-700',
   }
   return (
     <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${map[estado] ?? 'bg-slate-100 text-slate-500'}`}>
-      {labels[estado] ?? estado}
+      {estado === 'operativo' ? 'Operativo' : estado === 'mantenimiento' ? 'Mantenimiento' : 'Disponible'}
     </span>
   )
 }
 
-// ─── Modal genérico ───────────────────────────────────────────────────────────
+// ─── Componentes UI ───────────────────────────────────────────────────────────
 
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+
+function SectionHeader({ icon: Icon, label }: { icon: LucideIcon; label: string }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-          <p className="font-semibold text-slate-800">{title}</p>
-          <button onClick={onClose} className="w-7 h-7 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-        <div className="px-6 py-5">{children}</div>
-      </div>
+    <div className="flex items-center gap-2 pt-2 pb-1 border-b border-slate-100">
+      <Icon className="w-3.5 h-3.5 text-slate-400" />
+      <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">{label}</p>
     </div>
   )
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-xs font-medium text-slate-600 mb-1">{label}</label>
+      <label className="block text-xs font-medium text-slate-600 mb-1">
+        {label}{required && <span className="text-orange-500 ml-0.5">*</span>}
+      </label>
       {children}
     </div>
   )
 }
 
-const inputCls = 'w-full text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100'
+const inputCls = 'w-full text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100'
+const EMPTY_EXC: Partial<ExcavacionReg> = {
+  nombre: '', estado: 'Planificada',
+  tipoExcavacion: '', clasificacionTerreno: '', metodoExcavacion: '', turnoTrabajo: '',
+  fechaInicio: '', fechaFinEstimada: '', ingenieroResponsable: '', residenteObra: '', supervisorSeguridad: '',
+  observaciones: '',
+}
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 
@@ -125,11 +176,11 @@ export default function ExcavacionPage() {
 
   const [tab, setTab] = useState('excavaciones')
 
-  // Tareas (excavaciones)
-  const [tareas, setTareas] = useState<Tarea[]>([])
-  const [loadingTareas, setLoadingTareas] = useState(true)
-  const [nuevaTarea, setNuevaTarea] = useState('')
-  const [agregandoTarea, setAgregandoTarea] = useState(false)
+  // Excavaciones registro
+  const [excavaciones, setExcavaciones] = useState<ExcavacionReg[]>([])
+  const [loadingExc, setLoadingExc] = useState(true)
+  const [modalExc, setModalExc] = useState<Partial<ExcavacionReg> | null>(null)
+  const [guardandoExc, setGuardandoExc] = useState(false)
 
   // Contratas
   const [contratas, setContratas] = useState<Contrata[]>([])
@@ -145,58 +196,53 @@ export default function ExcavacionPage() {
 
   useEffect(() => {
     if (!proyectoId) return
-    // Cargar tareas
-    fetch(`${API_BASE}/tareas-fase/${proyectoId}/excavacion`, { headers })
-      .then(r => r.json()).then(setTareas).catch(() => {}).finally(() => setLoadingTareas(false))
-    // Cargar contratas
+    fetch(`${API_BASE}/excavacion-registros/${proyectoId}`, { headers })
+      .then(r => r.json()).then(setExcavaciones).catch(() => {}).finally(() => setLoadingExc(false))
     fetch(`${API_BASE}/contratas-fase/${proyectoId}/excavacion`, { headers })
       .then(r => r.json()).then(setContratas).catch(() => {}).finally(() => setLoadingContratas(false))
-    // Cargar equipos
     fetch(`${API_BASE}/equipos-fase/${proyectoId}/excavacion`, { headers })
       .then(r => r.json()).then(setEquipos).catch(() => {}).finally(() => setLoadingEquipos(false))
   }, [proyectoId])
 
   // ── KPIs ──────────────────────────────────────────────────────────────────
-  const completadas = tareas.filter(t => t.estado === 'completada').length
-  const avance = tareas.length ? Math.round((completadas / tareas.length) * 100) : 0
+  const completadas = excavaciones.filter(e => e.estado === 'Completada').length
+  const avance = excavaciones.length ? Math.round((completadas / excavaciones.length) * 100) : 0
+  const totalM3 = excavaciones.reduce((s, e) => s + (Number(e.volumenTotalM3) || 0), 0)
   const contratosActivos = contratas.filter(c => c.estado === 'activo').length
   const equiposOperativos = equipos.filter(e => e.estado === 'operativo').length
   const presupuestoTotal = contratas.reduce((s, c) => s + Number(c.presupuestoTotal), 0)
   const presupuestoAsignado = contratas.reduce((s, c) => s + Number(c.presupuestoAsignado), 0)
   const avancePresupuestal = presupuestoTotal > 0 ? Math.round((presupuestoAsignado / presupuestoTotal) * 100) : 0
 
-  // ── Tareas ────────────────────────────────────────────────────────────────
-  const ESTADO_SIGUIENTE: Record<string, string> = { pendiente: 'en_proceso', en_proceso: 'completada', completada: 'pendiente' }
-
-  async function avanzarTarea(t: Tarea) {
-    const nuevo = ESTADO_SIGUIENTE[t.estado]
-    setTareas(prev => prev.map(x => x.id === t.id ? { ...x, estado: nuevo as Tarea['estado'] } : x))
-    await fetch(`${API_BASE}/tareas-fase/${t.id}/estado`, { method: 'PATCH', headers, body: JSON.stringify({ estado: nuevo }) })
+  // ── Excavaciones CRUD ─────────────────────────────────────────────────────
+  async function guardarExcavacion() {
+    if (!modalExc?.nombre?.trim()) return
+    setGuardandoExc(true)
+    try {
+      const isNew = !modalExc.id
+      const url = isNew
+        ? `${API_BASE}/excavacion-registros/${proyectoId}`
+        : `${API_BASE}/excavacion-registros/${modalExc.id}`
+      const r = await fetch(url, { method: isNew ? 'POST' : 'PATCH', headers, body: JSON.stringify(modalExc) })
+      const saved = await r.json()
+      setExcavaciones(prev => isNew ? [...prev, saved] : prev.map(e => e.id === saved.id ? saved : e))
+      setModalExc(null)
+    } finally { setGuardandoExc(false) }
   }
 
-  async function agregarTarea() {
-    if (!nuevaTarea.trim()) return
-    const r = await fetch(`${API_BASE}/tareas-fase/${proyectoId}/excavacion`, {
-      method: 'POST', headers, body: JSON.stringify({ texto: nuevaTarea.trim() }),
-    })
-    setTareas(prev => [...prev, await r.json()])
-    setNuevaTarea(''); setAgregandoTarea(false)
+  async function eliminarExcavacion(id: string) {
+    setExcavaciones(prev => prev.filter(e => e.id !== id))
+    await fetch(`${API_BASE}/excavacion-registros/${id}`, { method: 'DELETE', headers })
   }
 
-  async function eliminarTarea(id: string) {
-    setTareas(prev => prev.filter(t => t.id !== id))
-    await fetch(`${API_BASE}/tareas-fase/${id}`, { method: 'DELETE', headers })
-  }
-
-  // ── Contratas ─────────────────────────────────────────────────────────────
+  // ── Contratas CRUD ────────────────────────────────────────────────────────
   async function guardarContrata() {
     if (!modalContrata?.empresa?.trim()) return
     setGuardandoContrata(true)
     try {
       const isNew = !modalContrata.id
       const url = isNew ? `${API_BASE}/contratas-fase/${proyectoId}/excavacion` : `${API_BASE}/contratas-fase/${modalContrata.id}`
-      const method = isNew ? 'POST' : 'PATCH'
-      const r = await fetch(url, { method, headers, body: JSON.stringify(modalContrata) })
+      const r = await fetch(url, { method: isNew ? 'POST' : 'PATCH', headers, body: JSON.stringify(modalContrata) })
       const saved = await r.json()
       setContratas(prev => isNew ? [...prev, saved] : prev.map(c => c.id === saved.id ? saved : c))
       setModalContrata(null)
@@ -208,15 +254,14 @@ export default function ExcavacionPage() {
     await fetch(`${API_BASE}/contratas-fase/${id}`, { method: 'DELETE', headers })
   }
 
-  // ── Equipos ───────────────────────────────────────────────────────────────
+  // ── Equipos CRUD ──────────────────────────────────────────────────────────
   async function guardarEquipo() {
     if (!modalEquipo?.nombre?.trim()) return
     setGuardandoEquipo(true)
     try {
       const isNew = !modalEquipo.id
       const url = isNew ? `${API_BASE}/equipos-fase/${proyectoId}/excavacion` : `${API_BASE}/equipos-fase/${modalEquipo.id}`
-      const method = isNew ? 'POST' : 'PATCH'
-      const r = await fetch(url, { method, headers, body: JSON.stringify(modalEquipo) })
+      const r = await fetch(url, { method: isNew ? 'POST' : 'PATCH', headers, body: JSON.stringify(modalEquipo) })
       const saved = await r.json()
       setEquipos(prev => isNew ? [...prev, saved] : prev.map(e => e.id === saved.id ? saved : e))
       setModalEquipo(null)
@@ -248,15 +293,13 @@ export default function ExcavacionPage() {
             <p className="text-xs text-orange-100">Movimiento de tierras, sótanos y calzaduras</p>
           </div>
         </div>
-
-        {/* KPIs */}
         <div className="grid grid-cols-5 gap-3">
           {[
-            { label: 'Avance obra', value: `${avance}%` },
-            { label: 'Contratas activas', value: String(contratosActivos) },
+            { label: 'Avance obra',        value: `${avance}%` },
+            { label: 'Vol. total m³',      value: totalM3 > 0 ? `${fmtNum(totalM3, 0)} m³` : '—' },
+            { label: 'Contratas activas',  value: String(contratosActivos) },
             { label: 'Equipos operativos', value: `${equiposOperativos}/${equipos.length}` },
-            { label: 'Presupuesto total', value: presupuestoTotal > 0 ? fmtSoles(presupuestoTotal) : '—' },
-            { label: 'Avance presup.', value: `${avancePresupuestal}%` },
+            { label: 'Avance presup.',     value: `${avancePresupuestal}%` },
           ].map(kpi => (
             <div key={kpi.label} className="bg-white/15 rounded-xl px-3 py-2.5">
               <p className="text-[10px] text-orange-100 mb-0.5">{kpi.label}</p>
@@ -289,63 +332,111 @@ export default function ExcavacionPage() {
         </div>
       </div>
 
-      {/* Contenido de tabs */}
+      {/* Contenido */}
       <div className="p-6">
 
-        {/* ── TAB: EXCAVACIONES (checklist) ── */}
+        {/* ── TAB: EXCAVACIONES ── */}
         {tab === 'excavaciones' && (
-          <div className="max-w-2xl space-y-3">
+          <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-slate-700">Lista de trabajos de excavación</p>
-              <span className="text-xs text-slate-400">{completadas}/{tareas.length} completados</span>
+              <div>
+                <p className="text-sm font-semibold text-slate-700">Registro de Excavaciones</p>
+                <p className="text-xs text-slate-400 mt-0.5">Sectores, zanjas y excavaciones del proyecto</p>
+              </div>
+              <button
+                onClick={() => setModalExc({ ...EMPTY_EXC })}
+                className="flex items-center gap-1.5 bg-orange-500 hover:bg-orange-400 text-white text-xs font-medium px-4 py-2 rounded-xl transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />Nueva Excavación
+              </button>
             </div>
 
-            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-              {loadingTareas ? (
-                <div className="flex items-center justify-center py-10 text-slate-400">
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" /><span className="text-sm">Cargando...</span>
-                </div>
-              ) : (
-                <div className="divide-y divide-slate-50">
-                  {tareas.map(t => (
-                    <div key={t.id} className="flex items-center gap-3 px-5 py-3.5 hover:bg-slate-50 group">
-                      <button onClick={() => avanzarTarea(t)} className="shrink-0">
-                        {t.estado === 'completada' ? <CheckCircle2 className="w-4 h-4 text-green-500" />
-                          : t.estado === 'en_proceso' ? <Clock className="w-4 h-4 text-orange-500" />
-                          : <Circle className="w-4 h-4 text-slate-300" />}
-                      </button>
-                      <span className={`text-sm flex-1 ${t.estado === 'completada' ? 'line-through text-slate-400' : 'text-slate-700'}`}>
-                        {t.texto}
-                      </span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium hidden group-hover:inline-block ${
-                        t.estado === 'completada' ? 'bg-slate-100 text-slate-500' :
-                        t.estado === 'en_proceso' ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-400'
-                      }`}>
-                        {t.estado === 'pendiente' ? 'Iniciar' : t.estado === 'en_proceso' ? 'Completar' : 'Reabrir'}
-                      </span>
-                      <button onClick={() => eliminarTarea(t.id)} className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-400 p-1 rounded">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <div className="px-5 py-3 border-t border-slate-100">
-                {agregandoTarea ? (
-                  <div className="flex items-center gap-2">
-                    <input autoFocus value={nuevaTarea} onChange={e => setNuevaTarea(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') agregarTarea(); if (e.key === 'Escape') { setAgregandoTarea(false); setNuevaTarea('') } }}
-                      placeholder="Descripción del trabajo..." className={inputCls} />
-                    <button onClick={agregarTarea} className="text-xs bg-orange-500 text-white px-3 py-2 rounded-xl hover:bg-orange-400">Agregar</button>
-                    <button onClick={() => { setAgregandoTarea(false); setNuevaTarea('') }} className="text-xs text-slate-400 px-2 py-2">Cancelar</button>
-                  </div>
-                ) : (
-                  <button onClick={() => setAgregandoTarea(true)} className="flex items-center gap-2 text-slate-400 hover:text-orange-500 text-sm">
-                    <Plus className="w-4 h-4" />Agregar trabajo
-                  </button>
-                )}
+            {loadingExc ? (
+              <div className="flex items-center justify-center py-16 text-slate-400">
+                <Loader2 className="w-4 h-4 animate-spin mr-2" /><span className="text-sm">Cargando...</span>
               </div>
-            </div>
+            ) : excavaciones.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-slate-400 gap-3">
+                <HardHat className="w-10 h-10 opacity-30" />
+                <p className="text-sm">Sin excavaciones registradas</p>
+                <p className="text-xs">Registra los sectores y zonas de excavación del proyecto</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {excavaciones.map(exc => (
+                  <div key={exc.id} className="bg-white rounded-2xl border border-slate-200 p-5 hover:shadow-sm transition-shadow">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-3 flex-1 min-w-0">
+                        <div className="w-9 h-9 rounded-xl bg-orange-50 flex items-center justify-center shrink-0 mt-0.5">
+                          <Layers className="w-4 h-4 text-orange-500" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-semibold text-slate-800">{exc.nombre}</p>
+                            {estadoExcBadge(exc.estado)}
+                          </div>
+                          <div className="flex items-center gap-4 mt-1.5 flex-wrap">
+                            {exc.tipoExcavacion && (
+                              <span className="text-xs text-slate-500">{exc.tipoExcavacion}</span>
+                            )}
+                            {exc.clasificacionTerreno && (
+                              <span className="text-xs text-slate-400">· {exc.clasificacionTerreno}</span>
+                            )}
+                            {exc.metodoExcavacion && (
+                              <span className="text-xs text-slate-400">· {exc.metodoExcavacion}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button onClick={() => setModalExc(exc)} className="text-xs text-slate-500 border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-50 flex items-center gap-1">
+                          <span>Editar</span><ChevronRight className="w-3 h-3" />
+                        </button>
+                        <button onClick={() => eliminarExcavacion(exc.id)} className="w-7 h-7 flex items-center justify-center text-slate-300 hover:text-red-400 border border-slate-200 rounded-lg hover:bg-red-50 transition-colors">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Métricas */}
+                    <div className="grid grid-cols-4 gap-3 mt-4">
+                      {[
+                        { label: 'Área total', value: exc.areaTotalM2 ? `${fmtNum(exc.areaTotalM2)} m²` : '—' },
+                        { label: 'Profundidad', value: exc.profundidadTotalM ? `${fmtNum(exc.profundidadTotalM)} m` : '—' },
+                        { label: 'Volumen total', value: exc.volumenTotalM3 ? `${fmtNum(exc.volumenTotalM3, 0)} m³` : '—' },
+                        { label: 'Nivel freático', value: exc.nivelFreatico ? `${fmtNum(exc.nivelFreatico)} m` : '—' },
+                      ].map(m => (
+                        <div key={m.label} className="bg-slate-50 rounded-xl px-3 py-2">
+                          <p className="text-[10px] text-slate-400 mb-0.5">{m.label}</p>
+                          <p className="text-sm font-semibold text-slate-700">{m.value}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Pie de tarjeta */}
+                    <div className="flex items-center gap-4 mt-3 pt-3 border-t border-slate-50 flex-wrap">
+                      {exc.ingenieroResponsable && (
+                        <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                          <User className="w-3 h-3" /><span>{exc.ingenieroResponsable}</span>
+                        </div>
+                      )}
+                      {exc.fechaInicio && (
+                        <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                          <Calendar className="w-3 h-3" /><span>Inicio: {exc.fechaInicio}</span>
+                        </div>
+                      )}
+                      {exc.coordUtmNorte && exc.coordUtmEste && (
+                        <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                          <MapPin className="w-3 h-3" />
+                          <span>N {fmtNum(exc.coordUtmNorte, 2)} / E {fmtNum(exc.coordUtmEste, 2)}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -391,7 +482,6 @@ export default function ExcavacionPage() {
                         </span>
                       </div>
                     </div>
-
                     {c.servicios?.length > 0 && (
                       <div>
                         <p className="text-[10px] text-slate-400 font-medium mb-1">Servicios</p>
@@ -400,16 +490,6 @@ export default function ExcavacionPage() {
                         </div>
                       </div>
                     )}
-
-                    {c.equipos?.length > 0 && (
-                      <div>
-                        <p className="text-[10px] text-slate-400 font-medium mb-1">Equipos incluidos</p>
-                        <div className="flex flex-wrap gap-1">
-                          {c.equipos.map(e => <span key={e} className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{e}</span>)}
-                        </div>
-                      </div>
-                    )}
-
                     <div className="space-y-1">
                       <div className="flex justify-between text-xs">
                         <span className="text-slate-500">Presupuesto</span>
@@ -423,18 +503,14 @@ export default function ExcavacionPage() {
                         <span>{c.presupuestoTotal > 0 ? Math.round((Number(c.presupuestoAsignado) / Number(c.presupuestoTotal)) * 100) : 0}%</span>
                       </div>
                     </div>
-
                     {c.contactoNombre && (
                       <div className="flex items-center gap-1.5 text-xs text-slate-500">
                         <Phone className="w-3 h-3" />
                         <span>{c.contactoNombre}{c.contactoTelefono ? ` — ${c.contactoTelefono}` : ''}</span>
                       </div>
                     )}
-
                     <div className="flex gap-2 pt-1">
-                      <button onClick={() => setModalContrata(c)} className="flex-1 text-xs text-slate-600 border border-slate-200 py-2 rounded-xl hover:bg-slate-50 transition-colors">
-                        Ver / Editar
-                      </button>
+                      <button onClick={() => setModalContrata(c)} className="flex-1 text-xs text-slate-600 border border-slate-200 py-2 rounded-xl hover:bg-slate-50 transition-colors">Ver / Editar</button>
                       <button onClick={() => eliminarContrata(c.id)} className="w-9 h-9 flex items-center justify-center text-slate-300 hover:text-red-400 border border-slate-200 rounded-xl hover:bg-red-50 transition-colors">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -470,7 +546,6 @@ export default function ExcavacionPage() {
               <div className="flex flex-col items-center justify-center py-16 text-slate-400 gap-3">
                 <Truck className="w-10 h-10 opacity-30" />
                 <p className="text-sm">Sin equipos registrados</p>
-                <p className="text-xs">Registra las excavadoras y maquinaria del proyecto</p>
               </div>
             ) : (
               <div className="grid grid-cols-3 gap-4">
@@ -482,43 +557,32 @@ export default function ExcavacionPage() {
                       </div>
                       {equipoEstadoBadge(e.estado)}
                     </div>
-
                     <div>
                       <p className="font-semibold text-slate-800 text-sm">{e.nombre}</p>
                       <p className="text-xs text-slate-400">{TIPOS_EQUIPO.find(t => t.value === e.tipo)?.label ?? e.tipo}</p>
                     </div>
-
                     <div className="space-y-1 text-xs text-slate-500">
                       {e.contrataEmpresa && <p>Contrata: <span className="text-slate-700">{e.contrataEmpresa}</span></p>}
                       {e.ubicacion && <p>Ubicación: <span className="text-slate-700">{e.ubicacion}</span></p>}
                       {e.operador && <p>Operador: <span className="text-slate-700">{e.operador}</span></p>}
                       <p>Horas: <span className="text-slate-700 font-medium">{e.horasTrabajadas}h</span></p>
                     </div>
-
                     <div className="flex items-center gap-1.5">
                       <Wrench className="w-3 h-3 text-slate-400" />
                       <span className={`text-[10px] font-medium ${e.mantenimientoEstado === 'al_dia' ? 'text-green-600' : e.mantenimientoEstado === 'en_proceso' ? 'text-amber-600' : 'text-red-500'}`}>
-                        Mantenimiento: {e.mantenimientoEstado === 'al_dia' ? 'Al día' : e.mantenimientoEstado === 'en_proceso' ? 'En proceso' : 'Pendiente'}
+                        {e.mantenimientoEstado === 'al_dia' ? 'Mantenimiento al día' : e.mantenimientoEstado === 'en_proceso' ? 'Mantenimiento en proceso' : 'Mantenimiento pendiente'}
                       </span>
                     </div>
-
-                    {/* Cambio rápido de estado */}
                     <div className="flex gap-1">
                       {(['operativo', 'mantenimiento', 'disponible'] as const).map(st => (
-                        <button
-                          key={st}
-                          onClick={() => cambiarEstadoEquipo(e, st)}
-                          className={`flex-1 text-[10px] py-1.5 rounded-lg font-medium transition-colors ${e.estado === st ? 'bg-orange-500 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
-                        >
+                        <button key={st} onClick={() => cambiarEstadoEquipo(e, st)}
+                          className={`flex-1 text-[10px] py-1.5 rounded-lg font-medium transition-colors ${e.estado === st ? 'bg-orange-500 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
                           {st === 'operativo' ? 'Op.' : st === 'mantenimiento' ? 'Mant.' : 'Disp.'}
                         </button>
                       ))}
                     </div>
-
                     <div className="flex gap-2">
-                      <button onClick={() => setModalEquipo(e)} className="flex-1 text-xs text-slate-600 border border-slate-200 py-1.5 rounded-xl hover:bg-slate-50">
-                        Editar
-                      </button>
+                      <button onClick={() => setModalEquipo(e)} className="flex-1 text-xs text-slate-600 border border-slate-200 py-1.5 rounded-xl hover:bg-slate-50">Editar</button>
                       <button onClick={() => eliminarEquipo(e.id)} className="w-8 flex items-center justify-center text-slate-300 hover:text-red-400 border border-slate-200 rounded-xl hover:bg-red-50">
                         <Trash2 className="w-3 h-3" />
                       </button>
@@ -533,12 +597,11 @@ export default function ExcavacionPage() {
         {/* ── TAB: PRESUPUESTO ── */}
         {tab === 'presupuesto' && (
           <div className="max-w-2xl space-y-4">
-            {/* KPIs presupuestales */}
             <div className="grid grid-cols-3 gap-3">
               {[
                 { label: 'Presupuesto Total', value: fmtSoles(presupuestoTotal), color: 'text-slate-800' },
-                { label: 'Asignado', value: fmtSoles(presupuestoAsignado), color: 'text-green-600' },
-                { label: 'Pendiente', value: fmtSoles(presupuestoTotal - presupuestoAsignado), color: 'text-amber-600' },
+                { label: 'Asignado',          value: fmtSoles(presupuestoAsignado), color: 'text-green-600' },
+                { label: 'Pendiente',         value: fmtSoles(presupuestoTotal - presupuestoAsignado), color: 'text-amber-600' },
               ].map(k => (
                 <div key={k.label} className="bg-white rounded-2xl border border-slate-200 px-5 py-4">
                   <p className="text-xs text-slate-500 mb-1">{k.label}</p>
@@ -546,8 +609,6 @@ export default function ExcavacionPage() {
                 </div>
               ))}
             </div>
-
-            {/* Barra general */}
             <div className="bg-white rounded-2xl border border-slate-200 px-5 py-4">
               <div className="flex justify-between text-xs text-slate-500 mb-2">
                 <span>Avance presupuestal</span>
@@ -557,8 +618,6 @@ export default function ExcavacionPage() {
                 <div className="h-full bg-orange-500 rounded-full transition-all" style={{ width: `${avancePresupuestal}%` }} />
               </div>
             </div>
-
-            {/* Desglose por contrata */}
             <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
               <div className="px-5 py-3 border-b border-slate-100">
                 <p className="text-sm font-semibold text-slate-700">Desglose por Contrata</p>
@@ -572,7 +631,7 @@ export default function ExcavacionPage() {
                 <table className="w-full text-xs">
                   <thead className="bg-slate-50">
                     <tr>
-                      {['Contrata', 'Tipo', 'Cobertura', 'Total', 'Asignado', 'Pendiente', 'Estado'].map(h => (
+                      {['Contrata', 'Tipo', 'Total', 'Asignado', 'Pendiente', 'Estado'].map(h => (
                         <th key={h} className="text-left px-4 py-2.5 text-slate-500 font-medium">{h}</th>
                       ))}
                     </tr>
@@ -582,7 +641,6 @@ export default function ExcavacionPage() {
                       <tr key={c.id} className="hover:bg-slate-50">
                         <td className="px-4 py-3 font-medium text-slate-700">{c.empresa}</td>
                         <td className="px-4 py-3 text-slate-500">{TIPOS_CONTRATA.find(t => t.value === c.tipo)?.label ?? c.tipo}</td>
-                        <td className="px-4 py-3">{c.cobertura === 'completa' ? <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-[10px] font-medium">Completa</span> : <span className="bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full text-[10px] font-medium">Parcial</span>}</td>
                         <td className="px-4 py-3 font-semibold text-slate-800">{fmtSoles(c.presupuestoTotal)}</td>
                         <td className="px-4 py-3 text-green-600 font-medium">{fmtSoles(c.presupuestoAsignado)}</td>
                         <td className="px-4 py-3 text-amber-600 font-medium">{fmtSoles(Number(c.presupuestoTotal) - Number(c.presupuestoAsignado))}</td>
@@ -606,11 +664,144 @@ export default function ExcavacionPage() {
         )}
       </div>
 
+      {/* ── MODAL: REGISTRAR / EDITAR EXCAVACIÓN ── */}
+      <AppDialog open={modalExc !== null} onClose={() => setModalExc(null)} title={modalExc?.id ? 'Editar Excavación' : 'Registrar Nueva Excavación'} wide>
+        {modalExc && <div className="space-y-5">
+
+            <SectionHeader icon={ClipboardList} label="Información General" />
+            <div className="space-y-3">
+              <Field label="Nombre / Código de Excavación" required>
+                <input className={inputCls} value={modalExc.nombre ?? ''} onChange={e => setModalExc(p => ({ ...p!, nombre: e.target.value }))} placeholder="Ej: EXC-001-SOTANO" />
+              </Field>
+              <div className="grid grid-cols-3 gap-3">
+                <Field label="Área Total (m²)" required>
+                  <input type="number" step="0.01" className={inputCls} value={modalExc.areaTotalM2 ?? ''}
+                    onChange={e => {
+                      const area = Number(e.target.value)
+                      const prof = modalExc.profundidadTotalM
+                      setModalExc(p => ({ ...p!, areaTotalM2: area, volumenTotalM3: prof ? Number((area * prof).toFixed(2)) : p!.volumenTotalM3 }))
+                    }} placeholder="1500.00" />
+                </Field>
+                <Field label="Profundidad Total (m)" required>
+                  <input type="number" step="0.01" className={inputCls} value={modalExc.profundidadTotalM ?? ''}
+                    onChange={e => {
+                      const prof = Number(e.target.value)
+                      const area = modalExc.areaTotalM2
+                      setModalExc(p => ({ ...p!, profundidadTotalM: prof, volumenTotalM3: area ? Number((area * prof).toFixed(2)) : p!.volumenTotalM3 }))
+                    }} placeholder="12.50" />
+                </Field>
+                <Field label="Volumen Total (m³)" required>
+                  <input type="number" step="0.01" className={inputCls} value={modalExc.volumenTotalM3 ?? ''} onChange={e => setModalExc(p => ({ ...p!, volumenTotalM3: Number(e.target.value) }))} placeholder="18750.00" />
+                </Field>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <Field label="Longitud Total (m)">
+                  <input type="number" step="0.01" className={inputCls} value={modalExc.longitudTotalM ?? ''} onChange={e => setModalExc(p => ({ ...p!, longitudTotalM: Number(e.target.value) }))} placeholder="75.00" />
+                </Field>
+                <Field label="Ancho Promedio (m)">
+                  <input type="number" step="0.01" className={inputCls} value={modalExc.anchoPromedioM ?? ''} onChange={e => setModalExc(p => ({ ...p!, anchoPromedioM: Number(e.target.value) }))} placeholder="20.00" />
+                </Field>
+                <Field label="Cota de Referencia (m.s.n.m.)">
+                  <input type="number" step="0.01" className={inputCls} value={modalExc.cotaReferenciaMsnm ?? ''} onChange={e => setModalExc(p => ({ ...p!, cotaReferenciaMsnm: Number(e.target.value) }))} placeholder="2245.50" />
+                </Field>
+              </div>
+            </div>
+
+            <SectionHeader icon={Settings2} label="Características Técnicas" />
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Tipo de Excavación" required>
+                <select className={inputCls} value={modalExc.tipoExcavacion ?? ''} onChange={e => setModalExc(p => ({ ...p!, tipoExcavacion: e.target.value }))}>
+                  <option value="">-- Seleccione el tipo --</option>
+                  {TIPOS_EXCAVACION.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </Field>
+              <Field label="Clasificación del Terreno" required>
+                <select className={inputCls} value={modalExc.clasificacionTerreno ?? ''} onChange={e => setModalExc(p => ({ ...p!, clasificacionTerreno: e.target.value }))}>
+                  <option value="">-- Seleccione la clasificación --</option>
+                  {CLASIFICACIONES_TERRENO.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </Field>
+              <Field label="Método de Excavación" required>
+                <select className={inputCls} value={modalExc.metodoExcavacion ?? ''} onChange={e => setModalExc(p => ({ ...p!, metodoExcavacion: e.target.value }))}>
+                  <option value="">-- Seleccione el método --</option>
+                  {METODOS_EXCAVACION.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </Field>
+              <Field label="Turno de Trabajo">
+                <select className={inputCls} value={modalExc.turnoTrabajo ?? ''} onChange={e => setModalExc(p => ({ ...p!, turnoTrabajo: e.target.value }))}>
+                  <option value="">-- Seleccione turno --</option>
+                  {TURNOS_TRABAJO.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </Field>
+            </div>
+
+            <SectionHeader icon={Globe} label="Condiciones Geológicas y Ambientales" />
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Nivel Freático (m)">
+                <input type="number" step="0.01" className={inputCls} value={modalExc.nivelFreatico ?? ''} onChange={e => setModalExc(p => ({ ...p!, nivelFreatico: Number(e.target.value) }))} placeholder="3.50" />
+              </Field>
+              <Field label="Pendiente Natural del Terreno (%)">
+                <input type="number" step="0.1" className={inputCls} value={modalExc.pendienteNatural ?? ''} onChange={e => setModalExc(p => ({ ...p!, pendienteNatural: Number(e.target.value) }))} placeholder="2.5" />
+              </Field>
+              <Field label="Coordenada UTM Norte">
+                <input type="number" step="0.01" className={inputCls} value={modalExc.coordUtmNorte ?? ''} onChange={e => setModalExc(p => ({ ...p!, coordUtmNorte: Number(e.target.value) }))} placeholder="8668542.15" />
+              </Field>
+              <Field label="Coordenada UTM Este">
+                <input type="number" step="0.01" className={inputCls} value={modalExc.coordUtmEste ?? ''} onChange={e => setModalExc(p => ({ ...p!, coordUtmEste: Number(e.target.value) }))} placeholder="287543.89" />
+              </Field>
+            </div>
+
+            <SectionHeader icon={CalendarDays} label="Planificación y Equipo Responsable" />
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Fecha de Inicio" required>
+                <input type="date" className={inputCls} value={modalExc.fechaInicio ?? ''} onChange={e => setModalExc(p => ({ ...p!, fechaInicio: e.target.value }))} />
+              </Field>
+              <Field label="Fecha Estimada de Finalización">
+                <input type="date" className={inputCls} value={modalExc.fechaFinEstimada ?? ''} onChange={e => setModalExc(p => ({ ...p!, fechaFinEstimada: e.target.value }))} />
+              </Field>
+              <Field label="Duración Estimada (días)">
+                <input type="number" className={inputCls} value={modalExc.duracionEstimadaDias ?? ''} onChange={e => setModalExc(p => ({ ...p!, duracionEstimadaDias: Number(e.target.value) }))} placeholder="45" />
+              </Field>
+              <Field label="Ingeniero Responsable">
+                <input className={inputCls} value={modalExc.ingenieroResponsable ?? ''} onChange={e => setModalExc(p => ({ ...p!, ingenieroResponsable: e.target.value }))} placeholder="Nombre del ingeniero" />
+              </Field>
+              <Field label="Residente de Obra">
+                <input className={inputCls} value={modalExc.residenteObra ?? ''} onChange={e => setModalExc(p => ({ ...p!, residenteObra: e.target.value }))} placeholder="Nombre del residente" />
+              </Field>
+              <Field label="Supervisor de Seguridad">
+                <input className={inputCls} value={modalExc.supervisorSeguridad ?? ''} onChange={e => setModalExc(p => ({ ...p!, supervisorSeguridad: e.target.value }))} placeholder="Nombre del supervisor" />
+              </Field>
+            </div>
+
+            <SectionHeader icon={Activity} label="Estado y Observaciones Técnicas" />
+            <div className="space-y-3">
+              <Field label="Estado de la Excavación" required>
+                <select className={inputCls} value={modalExc.estado ?? 'Planificada'} onChange={e => setModalExc(p => ({ ...p!, estado: e.target.value }))}>
+                  {ESTADOS_EXCAVACION.map(e => <option key={e} value={e}>{e}</option>)}
+                </select>
+              </Field>
+              <Field label="Observaciones Técnicas">
+                <textarea className={inputCls} rows={3} value={modalExc.observaciones ?? ''}
+                  onChange={e => setModalExc(p => ({ ...p!, observaciones: e.target.value }))}
+                  placeholder="Notas sobre el suelo, restricciones ambientales, servicios subterráneos, condiciones especiales de seguridad..." />
+              </Field>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button onClick={() => setModalExc(null)} className="flex-1 text-sm text-slate-600 border border-slate-200 py-2.5 rounded-xl hover:bg-slate-50">
+                Cancelar
+              </button>
+              <button onClick={guardarExcavacion} disabled={guardandoExc} className="flex-1 text-sm bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white py-2.5 rounded-xl font-medium transition-colors">
+                {guardandoExc ? 'Guardando...' : (modalExc.id ? 'Guardar Cambios' : 'Registrar Excavación')}
+              </button>
+            </div>
+          </div>}
+        </AppDialog>
+
       {/* ── MODAL CONTRATA ── */}
-      {modalContrata !== null && (
-        <Modal title={modalContrata.id ? 'Editar Contrata' : 'Nueva Contrata'} onClose={() => setModalContrata(null)}>
-          <div className="space-y-4">
-            <Field label="Empresa *">
+      <AppDialog open={modalContrata !== null} onClose={() => setModalContrata(null)} title={modalContrata?.id ? 'Editar Contrata' : 'Nueva Contrata'}>
+        {modalContrata && <div className="space-y-4">
+            <Field label="Empresa" required>
               <input className={inputCls} value={modalContrata.empresa ?? ''} onChange={e => setModalContrata(p => ({ ...p!, empresa: e.target.value }))} placeholder="Ej: Constructora Los Andes SAC" />
             </Field>
             <div className="grid grid-cols-2 gap-3">
@@ -627,10 +818,10 @@ export default function ExcavacionPage() {
               </Field>
             </div>
             <Field label="Servicios (separados por coma)">
-              <input className={inputCls} value={(modalContrata.servicios ?? []).join(', ')} onChange={e => setModalContrata(p => ({ ...p!, servicios: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }))} placeholder="Ej: Excavación, Eliminación de material" />
+              <input className={inputCls} value={(modalContrata.servicios ?? []).join(', ')} onChange={e => setModalContrata(p => ({ ...p!, servicios: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }))} placeholder="Excavación, Eliminación de material" />
             </Field>
             <Field label="Equipos incluidos (separados por coma)">
-              <input className={inputCls} value={(modalContrata.equipos ?? []).join(', ')} onChange={e => setModalContrata(p => ({ ...p!, equipos: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }))} placeholder="Ej: Excavadora CAT 320, Camiones 15m³" />
+              <input className={inputCls} value={(modalContrata.equipos ?? []).join(', ')} onChange={e => setModalContrata(p => ({ ...p!, equipos: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }))} placeholder="Excavadora CAT 320, Camiones 15m³" />
             </Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Presupuesto total (S/)">
@@ -665,15 +856,13 @@ export default function ExcavacionPage() {
                 {guardandoContrata ? 'Guardando...' : 'Guardar'}
               </button>
             </div>
-          </div>
-        </Modal>
-      )}
+          </div>}
+        </AppDialog>
 
       {/* ── MODAL EQUIPO ── */}
-      {modalEquipo !== null && (
-        <Modal title={modalEquipo.id ? 'Editar Equipo' : 'Nuevo Equipo'} onClose={() => setModalEquipo(null)}>
-          <div className="space-y-4">
-            <Field label="Nombre del equipo *">
+      <AppDialog open={modalEquipo !== null} onClose={() => setModalEquipo(null)} title={modalEquipo?.id ? 'Editar Equipo' : 'Nuevo Equipo'}>
+        {modalEquipo && <div className="space-y-4">
+            <Field label="Nombre del equipo" required>
               <input className={inputCls} value={modalEquipo.nombre ?? ''} onChange={e => setModalEquipo(p => ({ ...p!, nombre: e.target.value }))} placeholder="Ej: Excavadora CAT 320" />
             </Field>
             <div className="grid grid-cols-2 gap-3">
@@ -722,9 +911,8 @@ export default function ExcavacionPage() {
                 {guardandoEquipo ? 'Guardando...' : 'Guardar'}
               </button>
             </div>
-          </div>
-        </Modal>
-      )}
+          </div>}
+        </AppDialog>
     </div>
   )
 }
