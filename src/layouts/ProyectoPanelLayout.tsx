@@ -2,7 +2,7 @@ import { useState, useRef, useCallback } from 'react'
 import { Outlet, NavLink, useParams } from 'react-router-dom'
 import {
   LayoutDashboard, Hammer, HardHat,
-  Building2, PaintBucket, ClipboardList, Sparkles, BarChart2,
+  Building2, PaintBucket, ClipboardList, Sparkles, BarChart2, Settings2,
 } from 'lucide-react'
 import ChatPanel from '../components/ChatPanel'
 
@@ -14,6 +14,7 @@ const TABS = [
   { slug: 'construccion',   label: 'Construcción',    icon: Building2 },
   { slug: 'acabados',       label: 'Acabados',        icon: PaintBucket },
   { slug: 'administracion', label: 'Administración',  icon: ClipboardList },
+  { slug: 'configuracion',  label: 'Configuración',   icon: Settings2 },
 ]
 
 const MIN_WIDTH = 320

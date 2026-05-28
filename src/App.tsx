@@ -9,6 +9,7 @@ import ProyectoFasePage from './pages/ProyectoFasePage'
 import ExcavacionPage from './pages/ExcavacionPage'
 import AnalisisPage from './pages/AnalisisPage'
 import KnowledgeBasePage from './pages/KnowledgeBasePage'
+import ProyectoConfigPage from './pages/ProyectoConfigPage'
 import { useAuthStore } from './store/authStore'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -38,6 +39,7 @@ export default function App() {
           <Route index element={<ProyectoPanelPage />} />
           <Route path="analisis" element={<AnalisisPage />} />
           <Route path="excavacion" element={<ExcavacionPage />} />
+          <Route path="configuracion" element={<ProyectoConfigPage />} />
           <Route path=":fase" element={<ProyectoFasePage />} />
         </Route>
 
