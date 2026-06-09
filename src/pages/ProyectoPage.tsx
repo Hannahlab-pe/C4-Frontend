@@ -211,11 +211,9 @@ const MODULE_META = [
 
 function PanelPlanos({
   planos,
-  proyectoId,
   token,
 }: {
   planos: PlanoItem[]
-  proyectoId: string
   token: string
 }) {
   async function descargar(item: PlanoItem) {
@@ -604,13 +602,13 @@ export default function ProyectoPage() {
                 <PanelEstructura d={analisis.estructura} />
               )}
               {activeModule === 'financiero' && analisis.financiero && (
-                <FinancieroPanel financiero={analisis.financiero} />
+                <FinancieroPanel financiero={analisis.financiero as any} />
               )}
               {activeModule === 'costos' && analisis.cabida && (
                 <PanelCostos cabida={analisis.cabida} financiero={analisis.financiero} />
               )}
               {activeModule === 'planos' && (
-                <PanelPlanos planos={planos} proyectoId={id!} token={token!} />
+                <PanelPlanos planos={planos} token={token!} />
               )}
               {activeModule === 'cabida' && !analisis.cabida && (
                 <p className="text-xs text-slate-400">Datos de cabida no disponibles.</p>
