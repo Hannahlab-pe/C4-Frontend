@@ -1,13 +1,32 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Layers, Building, TrendingUp, Loader2, BarChart2,
   ConstructionIcon, CheckCircle2, AlertTriangle, XCircle, CalendarRange,
+  FileText, Activity, Flag,
 } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 import FinancieroPanel from '../components/FinancieroPanel'
 import CronogramaGantt from '../components/CronogramaGantt'
+import AvanceObra from '../components/AvanceObra'
+import type { AvanceData } from '../components/AvanceObra'
+import CierreObra from '../components/CierreObra'
+import type { CierreData } from '../components/CierreObra'
 import { API_BASE } from '../lib/config'
+
+type FaseProyecto = 'previo' | 'avance' | 'cierre'
+interface Seguimiento { avance?: AvanceData; cierre?: CierreData }
+
+const FASES = [
+  { key: 'previo', label: 'Pre-inversión',  icon: FileText },
+  { key: 'avance', label: 'Avance de obra', icon: Activity },
+  { key: 'cierre', label: 'Cierre',         icon: Flag },
+]
+const FASE_TITULO: Record<FaseProyecto, string> = {
+  previo: 'Análisis de Pre-inversión',
+  avance: 'Avance de Obra',
+  cierre: 'Cierre de Obra',
+}
 
 interface AnalisisCabida {
   area_terreno: number; planta_libre: number; pisos_vivienda: number
@@ -96,11 +115,15 @@ export default function AnalisisPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const token = useAuthStore((s) => s.token)
+  const [fase, setFase] = useState<FaseProyecto>('previo')
   const [active, setActive] = useState('cabida')
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<{
     cabida?: AnalisisCabida; estructura?: AnalisisEstructural; financiero?: AnalisisFinanciero; distrito?: string
   } | null>(null)
+  const [seguimiento, setSeguimiento] = useState<Seguimiento>({})
+  const hidratado = useRef(false)
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     if (!id) return
@@ -108,10 +131,23 @@ export default function AnalisisPage() {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => setData(d))
+      .then((d) => { setData(d); if (d?.seguimiento && typeof d.seguimiento === 'object') setSeguimiento(d.seguimiento) })
       .catch(() => setData(null))
-      .finally(() => setLoading(false))
+      .finally(() => { setLoading(false); hidratado.current = true })
   }, [id, token])
+
+  // Guardar seguimiento (debounced) en BD
+  useEffect(() => {
+    if (!id || !hidratado.current) return
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(() => {
+      fetch(`${API_BASE}/chat/${id}/seguimiento`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(seguimiento),
+      }).catch(() => {})
+    }, 700)
+  }, [id, token, seguimiento])
 
   if (loading) return (
     <div className="h-full flex items-center justify-center gap-3 text-slate-400">
@@ -149,16 +185,34 @@ export default function AnalisisPage() {
       {/* Header + Veredicto */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-base font-bold text-slate-800">Análisis de Pre-inversión</h2>
+          <h2 className="text-base font-bold text-slate-800">{FASE_TITULO[fase]}</h2>
           {data?.distrito && <p className="text-xs text-slate-400 mt-0.5">{data.distrito}</p>}
         </div>
-        {veredicto && (
+        {fase === 'previo' && veredicto && (
           <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm font-semibold ${veredicto.cls}`}>
             <veredicto.Icon className="w-4 h-4" />
             {veredicto.txt}
           </div>
         )}
       </div>
+
+      {/* Switcher de fases del proyecto: cómo empezó / cómo va / cómo terminó */}
+      <div className="flex gap-1 bg-slate-100 rounded-xl p-1 w-fit">
+        {FASES.map(({ key, label, icon: Icon }) => (
+          <button
+            key={key}
+            onClick={() => setFase(key as FaseProyecto)}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+              fase === key ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            <Icon className="w-3.5 h-3.5" /> {label}
+          </button>
+        ))}
+      </div>
+
+      {/* ════════════ FASE: PRE-INVERSIÓN (cómo empezó / lo proyectado) ════════════ */}
+      {fase === 'previo' && (<>
 
       {/* Resumen ejecutivo — KPIs siempre visibles */}
       {f && (
@@ -297,6 +351,26 @@ export default function AnalisisPage() {
       {active === 'estructura' && !data?.estructura && <p className="text-sm text-slate-400">Datos estructurales no disponibles.</p>}
       {active === 'financiero' && !data?.financiero && <p className="text-sm text-slate-400">Datos financieros no disponibles.</p>}
       {active === 'cronograma' && (!data?.cabida || !data?.financiero) && <p className="text-sm text-slate-400">Ejecuta un análisis completo para ver el cronograma.</p>}
+
+      </>)}
+
+      {/* ════════════ FASE: AVANCE DE OBRA (cómo va) ════════════ */}
+      {fase === 'avance' && (
+        c && f
+          ? <AvanceObra cabida={c} financiero={f}
+              value={seguimiento.avance ?? {}}
+              onChange={(avance) => setSeguimiento((s) => ({ ...s, avance }))} />
+          : <p className="text-sm text-slate-400">Ejecuta el análisis de pre-inversión primero para habilitar el seguimiento de obra.</p>
+      )}
+
+      {/* ════════════ FASE: CIERRE (cómo terminó) ════════════ */}
+      {fase === 'cierre' && (
+        c && f
+          ? <CierreObra cabida={c} financiero={f}
+              value={seguimiento.cierre ?? {}}
+              onChange={(cierre) => setSeguimiento((s) => ({ ...s, cierre }))} />
+          : <p className="text-sm text-slate-400">Ejecuta el análisis de pre-inversión primero para habilitar el cierre de obra.</p>
+      )}
     </div>
   )
 }

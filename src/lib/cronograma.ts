@@ -14,6 +14,10 @@ export interface FinancieroMin {
   meses_postentrega: number
   meses_proyecto: number
   velocidad_ventas_mensual: number
+  // Cifras financieras (usadas por el seguimiento de obra / cierre)
+  costo_total_usd?: number
+  utilidad_neta_usd?: number
+  tir_anual_pct?: number
 }
 
 export type Fase = 'Pre-obra' | 'Cimentación' | 'Estructura' | 'Acabados' | 'Ventas' | 'Cierre'
