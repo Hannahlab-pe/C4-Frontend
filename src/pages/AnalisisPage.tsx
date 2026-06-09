@@ -77,10 +77,19 @@ function veredictoDe(tir: number) {
 
 /** Grúa recomendada según pisos (misma tabla que el motor de planos) */
 function recomendarGrua(pisos: number) {
-  if (pisos <= 10) return { modelo: 'Potain MC85B (City Crane)', radio: 50, base: '3.2 × 3.2', carga: '5 ton' }
-  if (pisos <= 15) return { modelo: 'JASO J5010', radio: 50, base: '3.8 × 3.8', carga: '2.5 ton' }
-  if (pisos <= 20) return { modelo: 'Liebherr 85 EC-B 5', radio: 50, base: '3.0 × 3.0', carga: '5 ton' }
-  return { modelo: 'Potain MC175C', radio: 60, base: '4.5 × 4.5', carga: '8 ton' }
+  if (pisos <= 10) return { modelo: 'Potain MC85B (City Crane)', radio: 50, base: '3.2 × 3.2', ton: 5 }
+  if (pisos <= 15) return { modelo: 'JASO J5010', radio: 50, base: '3.8 × 3.8', ton: 2.5 }
+  if (pisos <= 20) return { modelo: 'Liebherr 85 EC-B 5', radio: 50, base: '3.0 × 3.0', ton: 5 }
+  return { modelo: 'Potain MC175C', radio: 60, base: '4.5 × 4.5', ton: 8 }
+}
+
+/** Alquiler mensual estimado en soles: a más capacidad, más caro (S/ 15k–30k/mes). */
+function precioGruaSoles(ton: number): string {
+  const centro = Math.min(30000, Math.max(15000, 15000 + ((ton - 3) / 7) * 15000))
+  const min = Math.round((centro * 0.92) / 1000) * 1000
+  const max = Math.round((centro * 1.08) / 1000) * 1000
+  const f = (n: number) => `S/ ${n.toLocaleString('es-PE')}`
+  return `${f(min)} – ${f(max)} /mes`
 }
 
 export default function AnalisisPage() {
@@ -202,12 +211,14 @@ export default function AnalisisPage() {
                 <ConstructionIcon className="w-4 h-4 text-slate-400" />
                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Grúa Torre Recomendada</p>
               </div>
-              <Row label="Modelo"          value={grua.modelo} highlight />
-              <Row label="Radio de pluma"  value={`${grua.radio} m`} />
-              <Row label="Base"            value={`${grua.base} m`} />
-              <Row label="Carga máxima"    value={grua.carga} />
+              <Row label="Modelo"           value={grua.modelo} highlight />
+              <Row label="Radio de pluma"   value={`${grua.radio} m`} />
+              <Row label="Base"             value={`${grua.base} m`} />
+              <Row label="Carga máxima"     value={`${grua.ton} ton`} />
+              <Row label="Alquiler estimado" value={precioGruaSoles(grua.ton)} highlight />
               <p className="text-[11px] text-slate-400 mt-3">
-                Selección automática según {c.pisos_vivienda} pisos. La posición óptima se grafica en el plano DXF (Hoja 0).
+                Selección automática según {c.pisos_vivienda} pisos. El alquiler escala con la capacidad (S/ 15k–30k/mes).
+                La posición óptima se grafica en el plano DXF (Hoja 0).
               </p>
             </div>
           )}

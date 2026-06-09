@@ -1,6 +1,6 @@
-// Generador de cronograma (Gantt) determinístico para C4.
+// Generador de cronograma (Gantt) determinístico para C4 — base SEMANAS.
 // Punto de partida paramétrico desde el análisis; el editor permite ajustar
-// fecha de inicio, frentes de trabajo, ritmo y duraciones por tarea.
+// fecha de inicio, frentes de trabajo y duraciones por tarea.
 
 export interface CabidaMin {
   pisos_vivienda: number
@@ -31,15 +31,15 @@ export interface TareaGantt {
   id: string
   nombre: string
   fase: Fase
-  inicio: number    // mes 1-based
-  duracion: number  // meses
+  inicio: number    // semana 1-based
+  duracion: number  // semanas
 }
 
 export interface CronoOverrides {
-  pre?: number
-  obra?: number
-  post?: number
-  duraciones?: Record<string, number>  // id de tarea -> duración override
+  pre?: number      // semanas
+  obra?: number     // semanas
+  post?: number     // semanas
+  duraciones?: Record<string, number>  // id de tarea -> duración (semanas)
 }
 
 export interface Cronograma {
@@ -47,24 +47,31 @@ export interface Cronograma {
   pre: number
   obra: number
   post: number
-  total: number
-  finObra: number   // mes en que termina la obra (hito de entrega de casco)
+  total: number     // semanas totales
+  finObra: number   // semana en que termina la obra (hito de entrega de casco)
 }
 
+const SEMANAS_MES = 4.345
+
 /** Frentes de trabajo → factor de compresión de la obra (cuadrillas en paralelo). */
-export function obraPorFrentes(obraBase: number, frentes: number): number {
+export function obraPorFrentes(obraBaseSemanas: number, frentes: number): number {
   const factor = frentes <= 1 ? 1 : frentes === 2 ? 0.8 : 0.68
-  return Math.max(6, Math.round(obraBase * factor))
+  return Math.max(4, Math.round(obraBaseSemanas * factor))
+}
+
+/** Semanas base de obra derivadas del análisis (meses → semanas). */
+export function obraSemanasBase(fin: FinancieroMin): number {
+  return Math.max(4, Math.round((fin.meses_construccion || 12) * SEMANAS_MES))
 }
 
 export function generarCronograma(cab: CabidaMin, fin: FinancieroMin, ov: CronoOverrides = {}): Cronograma {
-  const pre  = Math.max(1, ov.pre  ?? fin.meses_preobra     ?? 3)
-  const obra = Math.max(6, ov.obra ?? fin.meses_construccion ?? 12)
-  const post = Math.max(1, ov.post ?? fin.meses_postentrega  ?? 4)
+  const pre  = Math.max(1, ov.pre  ?? Math.round((fin.meses_preobra     ?? 3)  * SEMANAS_MES))
+  const obra = Math.max(4, ov.obra ?? Math.round((fin.meses_construccion ?? 12) * SEMANAS_MES))
+  const post = Math.max(1, ov.post ?? Math.round((fin.meses_postentrega  ?? 4)  * SEMANAS_MES))
   const total = pre + obra + post
   const dur = ov.duraciones ?? {}
 
-  // Convierte una fracción [a,b] del periodo de obra en (inicio, duracion) absolutos
+  // Convierte una fracción [a,b] del periodo de obra en (inicio, duracion) en semanas absolutas
   const seg = (a: number, b: number) => ({
     inicio: pre + Math.floor(a * obra) + 1,
     duracion: Math.max(1, Math.round((b - a) * obra)),
@@ -77,9 +84,9 @@ export function generarCronograma(cab: CabidaMin, fin: FinancieroMin, ov: CronoO
   const t: TareaGantt[] = []
 
   // ── Pre-obra ──
-  t.push(mk('compra', 'Compra de terreno y trámites', 'Pre-obra', 1, 1))
+  t.push(mk('compra', 'Compra de terreno y trámites', 'Pre-obra', 1, Math.max(2, Math.round(pre * 0.4))))
   t.push(mk('proyecto', 'Anteproyecto y proyecto (Arq./Est./IISS-IIEE)', 'Pre-obra', 1, pre))
-  t.push(mk('licencia', 'Licencia de edificación', 'Pre-obra', Math.max(1, pre), 1))
+  t.push(mk('licencia', 'Licencia de edificación', 'Pre-obra', Math.max(1, pre - 1), 2))
 
   // ── Construcción ──
   const exc = seg(0, cab.sotanos > 0 ? 0.20 : 0.10)
@@ -101,7 +108,7 @@ export function generarCronograma(cab: CabidaMin, fin: FinancieroMin, ov: CronoO
 
   // ── Ventas (transversal) ──
   t.push(mk('ventas', `Preventa y ventas (~${(fin.velocidad_ventas_mensual || 0).toFixed(1)} dptos/mes)`,
-    'Ventas', 2, Math.max(1, total - 2)))
+    'Ventas', 3, Math.max(1, total - 3)))
 
   // ── Cierre ──
   const pStart = pre + obra + 1
@@ -114,18 +121,26 @@ export function generarCronograma(cab: CabidaMin, fin: FinancieroMin, ov: CronoO
 
 const MESES_ES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Set', 'Oct', 'Nov', 'Dic']
 
-/** Etiqueta del mes índice (1-based) como "Mmm-AA" a partir de una fecha de inicio. */
-export function etiquetaMes(inicio: Date | null, indiceMes: number): string {
-  if (!inicio) return String(indiceMes)
-  const d = new Date(inicio.getFullYear(), inicio.getMonth() + (indiceMes - 1), 1)
-  return `${MESES_ES[d.getMonth()]}-${String(d.getFullYear()).slice(2)}`
+/** Etiqueta de una semana (1-based): "S{n}" o, con fecha de inicio, "dd Mmm". */
+export function etiquetaSemana(inicio: Date | null, idxSemana: number): string {
+  if (!inicio) return `S${idxSemana}`
+  const d = new Date(inicio.getTime() + (idxSemana - 1) * 7 * 86_400_000)
+  return `${d.getDate()} ${MESES_ES[d.getMonth()]}`
+}
+
+/** Índices de semana para rotular el eje (máx ~14 etiquetas, equiespaciadas). */
+export function ticksEje(total: number): number[] {
+  const step = Math.max(1, Math.ceil(total / 14))
+  const arr: number[] = []
+  for (let s = 1; s <= total; s += step) arr.push(s)
+  if (arr[arr.length - 1] !== total) arr.push(total)
+  return arr
 }
 
 /** Posición fraccional (0..1) de "hoy" dentro del cronograma; null si está fuera de rango. */
-export function posicionHoy(inicio: Date | null, total: number): number | null {
+export function posicionHoy(inicio: Date | null, totalSemanas: number): number | null {
   if (!inicio) return null
-  const ms = Date.now() - inicio.getTime()
-  const meses = ms / (1000 * 60 * 60 * 24 * 30.44)
-  if (meses < 0 || meses > total) return null
-  return meses / total
+  const semanas = (Date.now() - inicio.getTime()) / (7 * 86_400_000)
+  if (semanas < 0 || semanas > totalSemanas) return null
+  return semanas / totalSemanas
 }
