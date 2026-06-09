@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { FolderKanban, HardHat, Clock, CheckCircle2, Plus, MapPin, Sparkles, ChevronRight, Loader2 } from 'lucide-react'
+import { Plus, MapPin, ChevronRight, Loader2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import api from '../lib/api'
@@ -12,11 +12,20 @@ interface Proyecto {
   createdAt: string
 }
 
+const PHASE_IMGS = [
+  '/phases/construccion.jpg',
+  '/phases/excavacion.jpg',
+  '/phases/acabados.jpg',
+  '/phases/demolicion.jpg',
+  '/phases/administracion.jpg',
+]
+
 export default function DashboardPage() {
   const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
   const [proyectos, setProyectos] = useState<Proyecto[]>([])
   const [loading, setLoading] = useState(true)
+  const [slideIdx, setSlideIdx] = useState(0)
 
   useEffect(() => {
     api.get('/proyectos')
@@ -25,101 +34,176 @@ export default function DashboardPage() {
       .finally(() => setLoading(false))
   }, [])
 
+  useEffect(() => {
+    const t = setInterval(() => setSlideIdx((i) => (i + 1) % PHASE_IMGS.length), 4500)
+    return () => clearInterval(t)
+  }, [])
+
+  const firstName = user?.nombre?.split(' ')[0] ?? 'Ing.'
+
   const stats = [
-    { label: 'Proyectos activos', value: proyectos.length, icon: FolderKanban, color: 'bg-blue-50 text-blue-600' },
-    { label: 'En ejecución', value: proyectos.filter((p) => p.estado === 'ejecucion').length, icon: HardHat, color: 'bg-orange-50 text-orange-600' },
-    { label: 'En proceso', value: proyectos.filter((p) => !p.estado || p.estado === 'proceso').length, icon: Clock, color: 'bg-yellow-50 text-yellow-600' },
-    { label: 'Completados', value: proyectos.filter((p) => p.estado === 'completado').length, icon: CheckCircle2, color: 'bg-green-50 text-green-600' },
+    { label: 'Proyectos totales', value: proyectos.length },
+    { label: 'En ejecución',      value: proyectos.filter((p) => p.estado === 'ejecucion').length },
+    { label: 'En proceso',        value: proyectos.filter((p) => !p.estado || p.estado === 'proceso').length },
+    { label: 'Completados',       value: proyectos.filter((p) => p.estado === 'completado').length },
   ]
 
-  const recientes = proyectos.slice(0, 5)
-
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-slate-800">
-            Bienvenido, {user?.nombre?.split(' ')[0]}
-          </h2>
-          <p className="text-slate-500 text-sm mt-0.5">
-            Aquí tienes el resumen de tus proyectos de obra
-          </p>
+    <div className="space-y-4">
+
+      {/* ── 1. HERO ─────────────────────────────────────────────── */}
+      <div className="relative rounded-2xl overflow-hidden h-48">
+        {PHASE_IMGS.map((src, i) => (
+          <div
+            key={src}
+            className="absolute inset-0 transition-opacity duration-1000"
+            style={{
+              backgroundImage: `url(${src})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center 40%',
+              opacity: i === slideIdx ? 1 : 0,
+            }}
+          />
+        ))}
+        <div className="absolute inset-0 bg-linear-to-r from-black/90 via-black/60 to-black/20" />
+
+        <div className="relative z-10 h-full flex flex-col justify-between p-7">
+          <div>
+            <p className="text-white/40 text-[10px] font-semibold uppercase tracking-[0.22em] mb-1.5">
+              Panel de control
+            </p>
+            <h1 className="text-2xl font-black text-white tracking-tight">
+              Bienvenido, {firstName}
+            </h1>
+            <p className="text-white/40 text-sm mt-1">
+              {proyectos.length === 0
+                ? 'Crea tu primer proyecto para comenzar'
+                : `${proyectos.length} proyecto${proyectos.length !== 1 ? 's' : ''} en tu portafolio`}
+            </p>
+          </div>
+
+          {/* Slide dots */}
+          <div className="flex items-center gap-1.5">
+            {PHASE_IMGS.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setSlideIdx(i)}
+                className={`h-px rounded-full transition-all duration-300 ${
+                  i === slideIdx ? 'w-5 bg-white' : 'w-2 bg-white/25'
+                }`}
+              />
+            ))}
+          </div>
         </div>
+
         <button
           onClick={() => navigate('/proyectos')}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition-colors"
+          className="absolute top-6 right-6 z-10 flex items-center gap-1.5 bg-white text-slate-900
+            text-xs font-semibold px-3.5 py-2 rounded-lg hover:bg-slate-100 transition-colors shadow-lg"
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="w-3.5 h-3.5" />
           Nuevo proyecto
         </button>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-4 gap-4">
-        {stats.map(({ label, value, icon: Icon, color }) => (
-          <div key={label} className="bg-white rounded-2xl p-5 border border-slate-200">
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-slate-500 text-sm">{label}</p>
-              <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${color}`}>
-                <Icon className="w-4 h-4" />
-              </div>
+      {/* ── 2. STATS ────────────────────────────────────────────── */}
+      {!loading && (
+        <div className="grid grid-cols-4 gap-3">
+          {stats.map(({ label, value }) => (
+            <div key={label} className="bg-white rounded-xl border border-slate-100 px-6 py-4">
+              <p className="text-3xl font-black text-slate-800 tabular-nums leading-none">{value}</p>
+              <p className="text-slate-400 text-xs mt-1.5">{label}</p>
             </div>
-            <p className="text-3xl font-semibold text-slate-800">{loading ? '—' : value}</p>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
-      {/* Proyectos recientes */}
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-          <h3 className="font-semibold text-slate-800 text-sm">Proyectos recientes</h3>
-          <button onClick={() => navigate('/proyectos')} className="text-blue-600 text-xs font-medium hover:text-blue-500">
+      {/* ── 3. PROYECTOS ────────────────────────────────────────── */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-slate-700">Mis proyectos</h2>
+          <button
+            onClick={() => navigate('/proyectos')}
+            className="text-xs text-blue-600 hover:text-blue-500 font-medium transition-colors"
+          >
             Ver todos →
           </button>
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-5 h-5 text-slate-400 animate-spin" />
+          <div className="flex items-center justify-center h-36">
+            <Loader2 className="w-5 h-5 text-slate-300 animate-spin" />
           </div>
-        ) : recientes.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 gap-3">
-            <HardHat className="w-8 h-8 text-slate-200" />
-            <p className="text-sm text-slate-400">Aún no tienes proyectos. ¡Crea el primero!</p>
+        ) : proyectos.length === 0 ? (
+          <div
+            className="relative rounded-2xl overflow-hidden h-44 flex items-center justify-center cursor-pointer group"
+            style={{ backgroundImage: "url('/phases/excavacion.jpg')", backgroundSize: 'cover', backgroundPosition: 'center' }}
+            onClick={() => navigate('/proyectos')}
+          >
+            <div className="absolute inset-0 bg-black/65 group-hover:bg-black/55 transition-colors" />
+            <div className="relative z-10 text-center">
+              <div className="w-12 h-12 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center mx-auto mb-3">
+                <Plus className="w-6 h-6 text-white" />
+              </div>
+              <p className="text-white font-semibold text-sm">Crear primer proyecto</p>
+              <p className="text-white/50 text-xs mt-1">Comienza tu análisis de pre-inversión</p>
+            </div>
           </div>
         ) : (
-          recientes.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => navigate(`/proyectos/${p.id}/panel`)}
-              className="w-full flex items-center gap-4 px-6 py-4 hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-b-0 text-left group"
-            >
-              <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center shrink-0">
-                <HardHat className="w-5 h-5 text-white" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-slate-800">{p.nombre}</p>
-                <div className="flex items-center gap-3 mt-1">
-                  {p.distrito && (
-                    <span className="text-xs text-slate-400 flex items-center gap-1">
-                      <MapPin className="w-3 h-3" /> {p.distrito}
-                    </span>
-                  )}
-                  <span className="text-xs text-blue-500 flex items-center gap-1">
-                    <Sparkles className="w-3 h-3" /> IA activa
-                  </span>
-                </div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors shrink-0" />
-            </button>
-          ))
-        )}
+          <div className="grid grid-cols-3 gap-3">
+            {proyectos.map((p, i) => (
+              <button
+                key={p.id}
+                onClick={() => navigate(`/proyectos/${p.id}/panel`)}
+                className="relative overflow-hidden rounded-xl h-40 text-left group
+                  hover:-translate-y-1 hover:shadow-2xl hover:shadow-black/25
+                  transition-all duration-300"
+                style={{
+                  backgroundImage: `url(${PHASE_IMGS[i % PHASE_IMGS.length]})`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                }}
+              >
+                <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/35 to-transparent
+                  group-hover:from-black/70 transition-all duration-300" />
 
-        <div className="px-6 py-4 flex items-center justify-center border-t border-slate-100">
-          <button onClick={() => navigate('/proyectos')} className="text-slate-400 text-xs font-medium hover:text-blue-500 transition-colors flex items-center gap-1">
-            <Plus className="w-3.5 h-3.5" /> Crear nuevo proyecto
-          </button>
-        </div>
+                <span className="absolute top-3 left-4 font-mono text-[10px] text-white/35 tracking-[0.2em]">
+                  {String(i + 1).padStart(2, '0')}
+                </span>
+
+                <span className="absolute top-3 right-3 text-[10px] font-medium text-white/55
+                  bg-white/10 backdrop-blur-sm border border-white/10 rounded-full px-2 py-0.5 uppercase tracking-wide">
+                  {p.estado ?? 'Activo'}
+                </span>
+
+                <div className="absolute bottom-0 left-0 right-0 p-4 z-10">
+                  <p className="text-sm font-bold text-white leading-tight truncate">{p.nombre}</p>
+                  <div className="flex items-center justify-between mt-1">
+                    {p.distrito ? (
+                      <span className="text-[11px] text-white/55 flex items-center gap-1">
+                        <MapPin className="w-2.5 h-2.5" />{p.distrito}
+                      </span>
+                    ) : <span />}
+                    <ChevronRight className="w-3.5 h-3.5 text-white/35 group-hover:text-white/70
+                      group-hover:translate-x-0.5 transition-all duration-150" />
+                  </div>
+                </div>
+              </button>
+            ))}
+
+            <button
+              onClick={() => navigate('/proyectos')}
+              className="rounded-xl h-40 border border-dashed border-slate-200
+                flex flex-col items-center justify-center gap-2
+                hover:border-slate-300 hover:bg-slate-50 transition-all duration-200"
+            >
+              <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center">
+                <Plus className="w-3.5 h-3.5 text-slate-400" />
+              </div>
+              <p className="text-xs font-medium text-slate-400">Nuevo proyecto</p>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )

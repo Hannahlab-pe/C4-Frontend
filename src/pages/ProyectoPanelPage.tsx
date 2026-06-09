@@ -1,54 +1,41 @@
 import { useNavigate, useParams } from 'react-router-dom'
-import {
-  Hammer, HardHat, Building2,
-  PaintBucket, ClipboardList, ChevronRight,
-} from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
 
 const FASES = [
   {
     slug: 'demolicion',
+    label: '01',
     nombre: 'Demolición',
     descripcion: 'Retiro de estructuras existentes y limpieza del terreno',
-    icon: Hammer,
-    color: 'bg-red-50 border-red-200',
-    iconColor: 'text-red-600',
-    dot: 'bg-red-400',
+    img: '/phases/demolicion.jpg',
   },
   {
     slug: 'excavacion',
+    label: '02',
     nombre: 'Excavación',
     descripcion: 'Movimiento de tierras, sótanos y calzaduras',
-    icon: HardHat,
-    color: 'bg-orange-50 border-orange-200',
-    iconColor: 'text-orange-600',
-    dot: 'bg-orange-400',
+    img: '/phases/excavacion.jpg',
   },
   {
     slug: 'construccion',
+    label: '03',
     nombre: 'Construcción',
     descripcion: 'Casco estructural: cimentación, columnas, losas y muros',
-    icon: Building2,
-    color: 'bg-blue-50 border-blue-200',
-    iconColor: 'text-blue-600',
-    dot: 'bg-blue-400',
+    img: '/phases/construccion.jpg',
   },
   {
     slug: 'acabados',
+    label: '04',
     nombre: 'Acabados',
     descripcion: 'Albañilería, revestimientos, pintura y equipamiento',
-    icon: PaintBucket,
-    color: 'bg-green-50 border-green-200',
-    iconColor: 'text-green-600',
-    dot: 'bg-green-400',
+    img: '/phases/acabados.jpg',
   },
   {
     slug: 'administracion',
+    label: '05',
     nombre: 'Administración',
     descripcion: 'Licencias, SUNARP, independizaciones y entrega',
-    icon: ClipboardList,
-    color: 'bg-purple-50 border-purple-200',
-    iconColor: 'text-purple-600',
-    dot: 'bg-purple-400',
+    img: '/phases/administracion.jpg',
   },
 ]
 
@@ -59,25 +46,41 @@ export default function ProyectoPanelPage() {
   return (
     <div className="h-full overflow-y-auto p-6">
       <div className="grid grid-cols-3 gap-3">
-        {FASES.map(({ slug, nombre, descripcion, icon: Icon, color, iconColor, dot }) => (
+        {FASES.map(({ slug, label, nombre, descripcion, img }) => (
           <button
             key={slug}
             onClick={() => navigate(`/proyectos/${id}/panel/${slug}`)}
-            className="bg-white rounded-2xl border border-slate-200 p-4 flex flex-col gap-3 hover:border-slate-300 hover:shadow-md hover:-translate-y-0.5 hover:bg-slate-50 transition-all duration-200 text-left group"
+            className="relative overflow-hidden rounded-xl h-48 text-left group
+              hover:-translate-y-1 hover:shadow-2xl hover:shadow-black/40
+              transition-all duration-300"
+            style={{ backgroundImage: `url(${img})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
           >
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center border ${color}`}>
-              <Icon className={`w-5 h-5 ${iconColor}`} />
+            {/* Gradient overlay — dark at bottom for text, subtle at top */}
+            <div className="absolute inset-0 bg-linear-to-t from-black/85 via-black/40 to-black/10
+              group-hover:from-black/75 group-hover:via-black/30 transition-all duration-300" />
+
+            {/* Top-left: phase number */}
+            <span className="absolute top-3.5 left-4 font-mono text-[11px] text-white/50 tracking-[0.25em]">
+              {label}
+            </span>
+
+            {/* Top-right: status pill */}
+            <span className="absolute top-3 right-3 text-[10px] font-medium text-white/60
+              bg-white/10 backdrop-blur-sm border border-white/10 rounded-full px-2.5 py-0.5 uppercase tracking-wide">
+              Pendiente
+            </span>
+
+            {/* Bottom content */}
+            <div className="absolute bottom-0 left-0 right-0 p-4 z-10">
+              <p className="text-sm font-semibold text-white leading-tight">{nombre}</p>
+              <p className="text-[11px] text-white/60 mt-0.5 leading-relaxed line-clamp-2">{descripcion}</p>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-slate-800">{nombre}</p>
-              <p className="text-xs text-slate-400 mt-0.5 leading-relaxed line-clamp-2">{descripcion}</p>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="flex items-center gap-1.5 text-xs text-slate-400">
-                <span className={`w-1.5 h-1.5 rounded-full ${dot} opacity-50`} />
-                Pendiente
-              </span>
-              <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-500 transition-colors" />
+
+            {/* Hover arrow */}
+            <div className="absolute bottom-4 right-4 z-10
+              opacity-0 group-hover:opacity-100 translate-x-1 group-hover:translate-x-0
+              transition-all duration-200">
+              <ChevronRight className="w-4 h-4 text-white/80" />
             </div>
           </button>
         ))}

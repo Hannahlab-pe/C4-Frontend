@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Plus, Search, MapPin, HardHat, Sparkles, ChevronRight, Loader2 } from 'lucide-react'
+import {
+  Plus, Search, MapPin, Sparkles, ChevronRight, Loader2, HardHat, CalendarDays,
+  Building2, Layers, TrendingUp,
+} from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import api from '../lib/api'
 import AppDialog from '../components/AppDialog'
@@ -9,12 +12,40 @@ interface Proyecto {
   nombre: string
   distrito?: string
   ubicacion?: string
+  estado?: string
   createdAt: string
+}
+
+interface Stats { pisos?: number; deptos?: number; tir?: number; areaVend?: number }
+
+// Acentos de color por card (en vez de fotos que se repiten)
+const ACCENTS = [
+  'from-blue-500 to-blue-700',
+  'from-indigo-500 to-indigo-700',
+  'from-sky-500 to-cyan-600',
+  'from-violet-500 to-purple-700',
+  'from-cyan-500 to-blue-600',
+  'from-slate-600 to-slate-800',
+]
+
+function iniciales(nombre: string): string {
+  const palabras = nombre.trim().split(/\s+/).filter(Boolean)
+  if (palabras.length === 0) return '?'
+  if (palabras.length === 1) return palabras[0].slice(0, 2).toUpperCase()
+  return (palabras[0][0] + palabras[1][0]).toUpperCase()
+}
+
+function fmtFecha(iso?: string): string {
+  if (!iso) return ''
+  try {
+    return new Date(iso).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })
+  } catch { return '' }
 }
 
 export default function ProyectosPage() {
   const navigate = useNavigate()
   const [proyectos, setProyectos] = useState<Proyecto[]>([])
+  const [stats, setStats] = useState<Record<string, Stats>>({})
   const [loading, setLoading] = useState(true)
   const [busqueda, setBusqueda] = useState('')
   const [showModal, setShowModal] = useState(false)
@@ -24,9 +55,28 @@ export default function ProyectosPage() {
 
   useEffect(() => {
     api.get('/proyectos')
-      .then((r) => setProyectos(r.data))
-      .catch(() => {})
-      .finally(() => setLoading(false))
+      .then(async (r) => {
+        const lista: Proyecto[] = r.data
+        setProyectos(lista)
+        setLoading(false)
+        // Enriquecer cada card con stats del análisis (en paralelo, sin bloquear)
+        const entradas = await Promise.all(
+          lista.map(async (p) => {
+            try {
+              const { data } = await api.get(`/chat/${p.id}/analisis`)
+              if (!data) return [p.id, {}] as const
+              return [p.id, {
+                pisos: data.cabida?.pisos_vivienda,
+                deptos: data.cabida?.num_departamentos,
+                areaVend: data.cabida?.area_vendible_total,
+                tir: data.financiero?.tir_anual_pct,
+              }] as const
+            } catch { return [p.id, {}] as const }
+          }),
+        )
+        setStats(Object.fromEntries(entradas))
+      })
+      .catch(() => setLoading(false))
   }, [])
 
   async function crearProyecto() {
@@ -73,60 +123,114 @@ export default function ProyectosPage() {
         </button>
       </div>
 
-      {/* Lista */}
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-        {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="w-5 h-5 text-slate-400 animate-spin" />
-          </div>
-        ) : filtrados.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 gap-3">
-            <HardHat className="w-8 h-8 text-slate-300" />
-            <p className="text-sm text-slate-400">
-              {proyectos.length === 0
-                ? 'Aún no tienes proyectos. ¡Crea el primero!'
-                : 'Sin resultados para esa búsqueda.'}
-            </p>
-          </div>
-        ) : (
-          <>
-            {filtrados.map((p) => (
+      {/* Grid de proyectos */}
+      {loading ? (
+        <div className="flex items-center justify-center py-24">
+          <Loader2 className="w-5 h-5 text-slate-400 animate-spin" />
+        </div>
+      ) : filtrados.length === 0 && busqueda ? (
+        <div className="flex flex-col items-center justify-center py-20 gap-3">
+          <HardHat className="w-8 h-8 text-slate-300" />
+          <p className="text-sm text-slate-400">Sin resultados para “{busqueda}”.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filtrados.map((p, i) => {
+            const s = stats[p.id] ?? {}
+            const tieneAnalisis = s.pisos != null || s.tir != null
+            const estado = (p.estado ?? 'activo').toLowerCase()
+            const estadoCfg = estado === 'completado'
+              ? { txt: 'Completado', cls: 'bg-emerald-50 text-emerald-600 border-emerald-200' }
+              : estado === 'borrador'
+              ? { txt: 'Borrador', cls: 'bg-slate-100 text-slate-500 border-slate-200' }
+              : { txt: 'Activo', cls: 'bg-blue-50 text-blue-600 border-blue-200' }
+            return (
               <button
                 key={p.id}
                 onClick={() => navigate(`/proyectos/${p.id}/panel`)}
-                className="w-full flex items-center gap-4 px-6 py-5 hover:bg-slate-50 transition-colors border-b border-slate-100 text-left group last:border-b-0"
+                className="relative flex flex-col text-left bg-white rounded-2xl border border-slate-200 p-5
+                  hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-200/70 hover:border-blue-200
+                  transition-all duration-300 group"
               >
-                <div className="w-11 h-11 rounded-xl bg-blue-600 flex items-center justify-center shrink-0">
-                  <HardHat className="w-5 h-5 text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <p className="text-sm font-semibold text-slate-800">{p.nombre}</p>
-                    <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
-                      <Sparkles className="w-3 h-3" /> IA activa
-                    </span>
+                {/* Top: avatar + estado */}
+                <div className="flex items-start justify-between mb-3">
+                  <div className={`w-12 h-12 rounded-xl bg-linear-to-br ${ACCENTS[i % ACCENTS.length]}
+                    flex items-center justify-center shadow-lg shadow-slate-200`}>
+                    <span className="text-white font-bold text-sm tracking-tight">{iniciales(p.nombre)}</span>
                   </div>
-                  {p.distrito && (
-                    <span className="text-xs text-slate-400 flex items-center gap-1">
-                      <MapPin className="w-3 h-3" /> {p.distrito}
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${estadoCfg.cls}`}>
+                    {estadoCfg.txt}
+                  </span>
+                </div>
+
+                {/* Nombre + meta */}
+                <p className="text-base font-bold text-slate-800 leading-tight truncate">{p.nombre}</p>
+                <div className="flex items-center gap-3 mt-1.5">
+                  <span className="text-[11px] text-slate-500 flex items-center gap-1">
+                    <MapPin className="w-3 h-3 text-slate-400" /> {p.distrito || 'Sin distrito'}
+                  </span>
+                  {p.createdAt && (
+                    <span className="text-[11px] text-slate-400 flex items-center gap-1">
+                      <CalendarDays className="w-3 h-3" /> {fmtFecha(p.createdAt)}
                     </span>
                   )}
                 </div>
-                <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors shrink-0" />
-              </button>
-            ))}
-          </>
-        )}
 
-        <div className="px-6 py-4 flex justify-center border-t border-slate-100">
+                {/* Divisor */}
+                <div className="border-t border-slate-100 my-3.5" />
+
+                {/* Stats del análisis */}
+                {tieneAnalisis ? (
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <div className="flex items-center gap-1 text-[10px] text-slate-400 mb-0.5">
+                        <Building2 className="w-3 h-3" /> Pisos
+                      </div>
+                      <p className="text-sm font-bold text-slate-700">{s.pisos ?? '-'}</p>
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1 text-[10px] text-slate-400 mb-0.5">
+                        <Layers className="w-3 h-3" /> Deptos
+                      </div>
+                      <p className="text-sm font-bold text-slate-700">{s.deptos ?? '-'}</p>
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1 text-[10px] text-slate-400 mb-0.5">
+                        <TrendingUp className="w-3 h-3" /> TIR
+                      </div>
+                      <p className={`text-sm font-bold ${(s.tir ?? 0) >= 18 ? 'text-emerald-600' : (s.tir ?? 0) >= 12 ? 'text-amber-600' : 'text-slate-700'}`}>
+                        {s.tir != null ? `${s.tir.toFixed(0)}%` : '-'}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                    <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+                    Análisis pendiente — genéralo con el Asistente C4
+                  </div>
+                )}
+
+                {/* Flecha hover */}
+                <ChevronRight className="absolute bottom-5 right-5 w-4 h-4 text-slate-300
+                  opacity-0 group-hover:opacity-100 group-hover:text-blue-500 translate-x-1 group-hover:translate-x-0 transition-all duration-200" />
+              </button>
+            )
+          })}
+
+          {/* Card fantasma: nuevo proyecto */}
           <button
             onClick={() => setShowModal(true)}
-            className="text-slate-400 text-xs font-medium hover:text-blue-500 transition-colors flex items-center gap-1"
+            className="rounded-2xl min-h-52 border-2 border-dashed border-slate-300 hover:border-blue-400
+              hover:bg-blue-50/40 transition-all duration-200 flex flex-col items-center justify-center gap-2.5 group"
           >
-            <Plus className="w-3.5 h-3.5" /> Crear nuevo proyecto
+            <div className="w-12 h-12 rounded-2xl bg-blue-600 group-hover:scale-110 transition-transform duration-200 flex items-center justify-center shadow-lg shadow-blue-600/30">
+              <Plus className="w-5 h-5 text-white" />
+            </div>
+            <p className="text-sm font-semibold text-slate-600">Nuevo proyecto</p>
+            <p className="text-xs text-slate-400">Crea un análisis de pre-inversión</p>
           </button>
         </div>
-      </div>
+      )}
 
       {/* Modal */}
       <AppDialog open={showModal} onClose={() => setShowModal(false)} title="Nuevo proyecto">

@@ -2,14 +2,14 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
 import {
   Send, Mic, Paperclip, Sparkles, Loader2,
-  CheckCircle2, Download, FileText, X, Plus, Trash2,
+  CheckCircle2, Download, FileText, X, Plus, Trash2, Map,
 } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 import { API_BASE, API_HOST } from '../lib/config'
 
 interface ChatMensaje {
   id: number
-  rol: 'user' | 'assistant' | 'pdf'
+  rol: 'user' | 'assistant' | 'pdf' | 'plano'
   contenido: string
   streaming?: boolean
   adjunto?: { nombre: string; tipo: string; base64: string }
@@ -25,7 +25,7 @@ export default function ChatPanel({ proyectoId, onClose }: Props) {
   const headers = { Authorization: `Bearer ${token}` }
 
   const [mensajes, setMensajes] = useState<ChatMensaje[]>([
-    { id: 0, rol: 'assistant', contenido: 'Hola, soy el Asistente C4. Dime el área del terreno en m² y el distrito de Lima para calcular la cabida, estructura y modelo financiero.' },
+    { id: 0, rol: 'assistant', contenido: 'Hola, soy el **Asistente C4** — motor de pre-inversión para Lima.\n\nVoy a hacerte una serie de preguntas para construir el análisis más preciso posible. Cuantos más datos me des, más exactos serán la cabida, el modelo financiero y el plano DXF.\n\n¿Cuéntame sobre el terreno que tienes? Empieza por la **ubicación o distrito** y si hay algo construido actualmente.' },
   ])
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
@@ -164,6 +164,13 @@ export default function ChatPanel({ proyectoId, onClose }: Props) {
             ])
           } else if (eventType === 'pdf_ready') {
             setMensajes((prev) => [...prev, { id: Date.now(), rol: 'pdf', contenido: data.url }])
+          } else if (eventType === 'plano_ready') {
+            setMensajes((prev) => {
+              const idx = prev.findIndex((m) => m.id === assistantId)
+              const planoMsg = { id: Date.now(), rol: 'plano' as const, contenido: data.url }
+              if (idx === -1) return [...prev, planoMsg]
+              return [...prev.slice(0, idx), planoMsg, ...prev.slice(idx)]
+            })
           } else if (eventType === 'done') {
             setSteps((prev) => prev.map((s) => ({ ...s, done: true })))
             setTimeout(() => setSteps([]), 1800)
@@ -266,6 +273,30 @@ export default function ChatPanel({ proyectoId, onClose }: Props) {
             >
               <Download className="w-3.5 h-3.5" />
               Descargar informe PDF
+            </button>
+          </div>
+        ) : msg.rol === 'plano' ? (
+          <div key={msg.id} className="flex justify-start">
+            <div className="w-6 h-6 rounded-lg bg-emerald-600 flex items-center justify-center shrink-0 mr-2 mt-0.5">
+              <Map className="w-3 h-3 text-white" />
+            </div>
+            <button
+              onClick={() => {
+                if (!token) return
+                fetch(`${API_HOST}${msg.contenido}`, { headers })
+                  .then((r) => r.blob())
+                  .then((blob) => {
+                    const url = URL.createObjectURL(blob)
+                    const a = document.createElement('a')
+                    a.href = url; a.download = 'plano-c4.dxf'
+                    document.body.appendChild(a); a.click()
+                    document.body.removeChild(a); URL.revokeObjectURL(url)
+                  })
+              }}
+              className="flex items-center gap-2 bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-50 rounded-2xl rounded-bl-sm shadow-sm px-3 py-2.5 text-sm font-medium transition-colors"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Descargar plano DXF · ZwCAD / AutoCAD
             </button>
           </div>
         ) : (

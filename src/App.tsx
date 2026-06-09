@@ -8,7 +8,9 @@ import ProyectoPanelPage from './pages/ProyectoPanelPage'
 import ProyectoFasePage from './pages/ProyectoFasePage'
 import ExcavacionPage from './pages/ExcavacionPage'
 import AnalisisPage from './pages/AnalisisPage'
+import CronogramaPage from './pages/CronogramaPage'
 import KnowledgeBasePage from './pages/KnowledgeBasePage'
+import NormativasAdminPage from './pages/NormativasAdminPage'
 import ProyectoConfigPage from './pages/ProyectoConfigPage'
 import { useAuthStore } from './store/authStore'
 
@@ -33,11 +35,13 @@ export default function App() {
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="proyectos" element={<ProyectosPage />} />
         <Route path="base-conocimiento" element={<KnowledgeBasePage />} />
+        <Route path="normativas" element={<NormativasAdminPage />} />
 
         {/* Panel del proyecto */}
         <Route path="proyectos/:id/panel" element={<ProyectoPanelLayout />}>
           <Route index element={<ProyectoPanelPage />} />
           <Route path="analisis" element={<AnalisisPage />} />
+          <Route path="cronograma" element={<CronogramaPage />} />
           <Route path="excavacion" element={<ExcavacionPage />} />
           <Route path="configuracion" element={<ProyectoConfigPage />} />
           <Route path=":fase" element={<ProyectoFasePage />} />

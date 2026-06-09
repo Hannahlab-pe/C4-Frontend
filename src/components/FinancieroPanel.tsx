@@ -5,27 +5,38 @@ import {
 
 interface FlujoMes {
   mes: number
+  fase: string
   ingresos: number
   egresos: number
   flujo_neto: number
-  flujo_acumulado: number
+  flujo_equity: number
+  flujo_equity_acum: number
+  unidades_vendidas: number
 }
 
 interface FinancieroData {
+  // KPIs
   tir_anual_pct: number
   van_usd: number
-  margen_bruto_pct: number
+  margen_neto_pct: number
   payback_meses: number
   utilidad_neta_usd: number
-  ingreso_total_ventas_usd: number
+  ingreso_total_usd: number
   costo_total_usd: number
-  costo_construccion_usd: number
-  costo_terreno_usd: number
-  costo_proyectos_usd: number
-  costo_ventas_usd: number
-  costo_admin_usd: number
   punto_equilibrio_deptos: number
   meses_proyecto: number
+  // Costos detallados
+  costo_terreno_usd: number
+  costo_construccion_usd: number
+  costo_licencias_diseno_usd: number
+  costo_marketing_usd: number
+  costo_corretaje_usd: number
+  costo_supervision_usd: number
+  costo_gerencia_usd: number
+  costo_imprevistos_usd: number
+  costo_titulacion_usd: number
+  costo_financiamiento_usd: number
+  // Flujo
   flujo_caja: FlujoMes[]
 }
 
@@ -34,6 +45,7 @@ interface Props {
 }
 
 const fmt = (n: number) =>
+  n == null ? '-' :
   n >= 1_000_000
     ? `$${(n / 1_000_000).toFixed(1)}M`
     : `$${(n / 1_000).toFixed(0)}K`
@@ -57,31 +69,31 @@ export default function FinancieroPanel({ financiero: f }: Props) {
   const flujo = f.flujo_caja ?? []
 
   const costos = [
-    { name: 'Construcción', value: f.costo_construccion_usd },
-    { name: 'Terreno', value: f.costo_terreno_usd },
-    { name: 'Proyectos', value: f.costo_proyectos_usd },
-    { name: 'Ventas', value: f.costo_ventas_usd },
-    { name: 'Admin', value: f.costo_admin_usd },
+    { name: 'Construcción',     value: f.costo_construccion_usd ?? 0 },
+    { name: 'Terreno',          value: f.costo_terreno_usd ?? 0 },
+    { name: 'Licencias/Diseño', value: f.costo_licencias_diseno_usd ?? 0 },
+    { name: 'Ventas/Corretaje', value: (f.costo_marketing_usd ?? 0) + (f.costo_corretaje_usd ?? 0) },
+    { name: 'Admin/Otros',      value: (f.costo_supervision_usd ?? 0) + (f.costo_gerencia_usd ?? 0) + (f.costo_imprevistos_usd ?? 0) + (f.costo_titulacion_usd ?? 0) + (f.costo_financiamiento_usd ?? 0) },
   ]
   const coloresCostos = ['#3b82f6', '#6366f1', '#8b5cf6', '#a78bfa', '#c4b5fd']
 
-  const tirColor = f.tir_anual_pct >= 20 ? 'text-green-600' : f.tir_anual_pct >= 12 ? 'text-amber-600' : 'text-red-600'
-  const vanColor = f.van_usd > 0 ? 'text-green-600' : 'text-red-600'
+  const tirColor = (f.tir_anual_pct ?? 0) >= 20 ? 'text-green-600' : (f.tir_anual_pct ?? 0) >= 12 ? 'text-amber-600' : 'text-red-600'
+  const vanColor = (f.van_usd ?? 0) > 0 ? 'text-green-600' : 'text-red-600'
 
   return (
     <div className="space-y-4">
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-2">
-        <KpiCard label="TIR Anual" value={`${f.tir_anual_pct.toFixed(1)}%`} sub="Tasa interna de retorno" color={tirColor} />
+        <KpiCard label="TIR Anual" value={`${(f.tir_anual_pct ?? 0).toFixed(1)}%`} sub="Tasa interna de retorno" color={tirColor} />
         <KpiCard label="VAN (12%)" value={fmt(f.van_usd)} sub="Valor actual neto" color={vanColor} />
-        <KpiCard label="Margen bruto" value={`${f.margen_bruto_pct.toFixed(1)}%`} sub={`Utilidad: ${fmt(f.utilidad_neta_usd)}`} />
-        <KpiCard label="Payback" value={`${f.payback_meses} meses`} sub={`Eq. ${f.punto_equilibrio_deptos} deptos`} />
+        <KpiCard label="Margen neto" value={`${(f.margen_neto_pct ?? 0).toFixed(1)}%`} sub={`Utilidad: ${fmt(f.utilidad_neta_usd)}`} />
+        <KpiCard label="Payback" value={`${f.payback_meses ?? '-'} meses`} sub={`Eq. ${f.punto_equilibrio_deptos ?? '-'} deptos`} />
       </div>
 
       {/* Flujo de caja acumulado */}
       {flujo.length > 0 && (
         <div className="bg-white rounded-xl border border-slate-200 p-4">
-          <p className="text-xs font-medium text-slate-600 mb-3">Flujo de Caja Acumulado</p>
+          <p className="text-xs font-medium text-slate-600 mb-3">Flujo de Caja Acumulado (equity)</p>
           <ResponsiveContainer width="100%" height={160}>
             <AreaChart data={flujo} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
               <defs>
@@ -101,7 +113,7 @@ export default function FinancieroPanel({ financiero: f }: Props) {
               <ReferenceLine y={0} stroke="#94a3b8" strokeDasharray="4 4" />
               <Area
                 type="monotone"
-                dataKey="flujo_acumulado"
+                dataKey="flujo_equity_acum"
                 stroke="#3b82f6"
                 strokeWidth={2}
                 fill="url(#gradPositivo)"
@@ -143,7 +155,7 @@ export default function FinancieroPanel({ financiero: f }: Props) {
                 <div
                   className="h-full rounded-full"
                   style={{
-                    width: `${(c.value / f.costo_total_usd) * 100}%`,
+                    width: `${(c.value / (f.costo_total_usd || 1)) * 100}%`,
                     backgroundColor: coloresCostos[i],
                   }}
                 />
