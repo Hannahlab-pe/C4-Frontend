@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import {
   Hammer, HardHat, Building2, PaintBucket, ClipboardList,
   CheckCircle2, Circle, Clock, Plus, Trash2, Loader2,
-  Truck, Wrench, CalendarRange, Sparkles,
+  Truck, Wrench, CalendarRange, Sparkles, Table2, ListChecks, FileText,
 } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 import { API_BASE } from '../lib/config'
@@ -23,6 +23,16 @@ interface Equipo {
   estado: string
   notas?: string
   contrataEmpresa?: string
+}
+
+// Sección estructurada del módulo (la IA las rellena con generar_proyecto)
+interface Seccion {
+  titulo: string
+  tipo: 'kv' | 'tabla' | 'lista'
+  kv?: { label: string; valor: string }[]
+  columnas?: string[]
+  filas?: string[][]
+  items?: string[]
 }
 
 interface Analisis {
@@ -205,6 +215,67 @@ function statsDeFase(fase: string, a: Analisis): { label: string; value: string 
   }
 }
 
+const SECCION_ICON: Record<string, React.ElementType> = {
+  kv: FileText, tabla: Table2, lista: ListChecks,
+}
+
+function SeccionCard({ s }: { s: Seccion }) {
+  const Icon = SECCION_ICON[s.tipo] ?? FileText
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-100 bg-slate-50/60">
+        <Icon className="w-3.5 h-3.5 text-slate-400" />
+        <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">{s.titulo}</p>
+      </div>
+
+      {s.tipo === 'kv' && (
+        <div className="px-4 py-1">
+          {(s.kv ?? []).map((par, i) => (
+            <div key={i} className="flex items-start justify-between gap-3 py-2 border-b border-slate-50 last:border-0">
+              <span className="text-xs text-slate-500">{par.label}</span>
+              <span className="text-xs font-semibold text-slate-800 text-right">{par.valor}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {s.tipo === 'tabla' && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-slate-100">
+                {(s.columnas ?? []).map((col, i) => (
+                  <th key={i} className="text-left font-medium text-slate-400 px-4 py-2 whitespace-nowrap">{col}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {(s.filas ?? []).map((fila, i) => (
+                <tr key={i} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50">
+                  {fila.map((celda, j) => (
+                    <td key={j} className={`px-4 py-2 ${j === 0 ? 'font-medium text-slate-700' : 'text-slate-500'}`}>{celda}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {s.tipo === 'lista' && (
+        <div className="px-4 py-2">
+          {(s.items ?? []).map((item, i) => (
+            <div key={i} className="flex items-start gap-2 py-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-blue-400 shrink-0 mt-0.5" />
+              <span className="text-xs text-slate-600 leading-relaxed">{item}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function ProyectoFasePage() {
   const { id: proyectoId, fase } = useParams<{ id: string; fase: string }>()
   const token = useAuthStore((s) => s.token)
@@ -212,11 +283,13 @@ export default function ProyectoFasePage() {
 
   const [tareas, setTareas] = useState<Tarea[]>([])
   const [equipos, setEquipos] = useState<Equipo[]>([])
+  const [secciones, setSecciones] = useState<Seccion[]>([])
   const [analisis, setAnalisis] = useState<Analisis>({})
   const [loading, setLoading] = useState(true)
   const [nuevaTarea, setNuevaTarea] = useState('')
   const [agregando, setAgregando] = useState(false)
   const [guardando, setGuardando] = useState<string | null>(null)
+  const seedEnCurso = useRef(false) // evita doble seed (StrictMode ejecuta el efecto 2 veces)
 
   const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
 
@@ -228,7 +301,8 @@ export default function ProyectoFasePage() {
     fetch(`${API_BASE}/tareas-fase/${proyectoId}/${fase}`, { headers })
       .then((r) => r.json())
       .then(async (data: Tarea[]) => {
-        if (data.length === 0 && config) {
+        if (data.length === 0 && config && !seedEnCurso.current) {
+          seedEnCurso.current = true
           const creadas: Tarea[] = []
           for (const texto of config.tareasDefault) {
             const r = await fetch(`${API_BASE}/tareas-fase/${proyectoId}/${fase}`, {
@@ -237,7 +311,8 @@ export default function ProyectoFasePage() {
             creadas.push(await r.json())
           }
           setTareas(creadas)
-        } else {
+          seedEnCurso.current = false
+        } else if (data.length > 0) {
           setTareas(data)
         }
       })
@@ -248,6 +323,12 @@ export default function ProyectoFasePage() {
       .then((r) => (r.ok ? r.json() : []))
       .then((d) => setEquipos(Array.isArray(d) ? d : []))
       .catch(() => setEquipos([]))
+
+    // Secciones estructuradas del módulo (sub-módulos generados por la IA)
+    fetch(`${API_BASE}/fases-detalle/${proyectoId}/${fase}`, { headers })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setSecciones(Array.isArray(d?.datos?.secciones) ? d.datos.secciones : []))
+      .catch(() => setSecciones([]))
 
     // Análisis del proyecto → KPIs de la fase
     fetch(`${API_BASE}/chat/${proyectoId}/analisis`, { headers })
@@ -337,6 +418,18 @@ export default function ProyectoFasePage() {
         <div className="flex items-center gap-2 text-xs text-slate-400 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
           <Sparkles className="w-3.5 h-3.5 text-blue-400 shrink-0" />
           Ejecuta el análisis con el Asistente C4 para ver los datos clave de esta fase (volúmenes, costos, duración).
+        </div>
+      )}
+
+      {/* Sub-módulos de la fase (secciones estructuradas generadas por la IA) */}
+      {secciones.length > 0 ? (
+        <div className="grid md:grid-cols-2 gap-4 items-start">
+          {secciones.map((s, i) => <SeccionCard key={i} s={s} />)}
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 text-xs text-slate-400 bg-blue-50/50 border border-blue-100 rounded-xl px-4 py-3">
+          <Sparkles className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+          Este módulo aún no tiene su plan detallado (permisos, metrados, materiales, gestión). Pídele al Asistente C4: «genera el proyecto» y se rellenará automáticamente.
         </div>
       )}
 
