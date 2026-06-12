@@ -3,14 +3,40 @@ import { useParams } from 'react-router-dom'
 import {
   Hammer, HardHat, Building2, PaintBucket, ClipboardList,
   CheckCircle2, Circle, Clock, Plus, Trash2, Loader2,
+  Truck, Wrench, CalendarRange, Sparkles,
 } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 import { API_BASE } from '../lib/config'
+import { generarCronograma } from '../lib/cronograma'
+import type { CabidaMin, FinancieroMin } from '../lib/cronograma'
 
 interface Tarea {
   id: string
   texto: string
   estado: 'pendiente' | 'en_proceso' | 'completada'
+}
+
+interface Equipo {
+  id: string
+  nombre: string
+  tipo: string
+  estado: string
+  notas?: string
+  contrataEmpresa?: string
+}
+
+interface Analisis {
+  cabida?: CabidaMin & {
+    planta_libre: number; area_construida_bruta: number; area_vendible_total: number
+    estacionamientos_requeridos: number; estacionamientos_en_sotano: number
+  }
+  financiero?: FinancieroMin & {
+    costo_construccion_usd?: number; costo_demolicion_usd?: number
+    costo_licencias_diseno_usd?: number; costo_titulacion_usd?: number
+    punto_equilibrio_deptos?: number; meses_proyecto?: number
+    concreto?: number
+  }
+  estructura?: { concreto_total_m3: number; acero_total_ton: number }
 }
 
 const FASES_CONFIG: Record<string, {
@@ -94,12 +120,99 @@ const ESTADO_SIGUIENTE: Record<string, string> = {
   completada: 'pendiente',
 }
 
+const TIPO_EQUIPO_ICON: Record<string, React.ElementType> = {
+  grua: Building2, excavadora: HardHat, retroexcavadora: HardHat,
+  volquete: Truck, mezcladora: Wrench, bomba_concreto: Wrench,
+  andamios: Building2, otro: Wrench,
+}
+
+const usd = (n?: number) =>
+  n == null ? '—' : n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(2)}M` : `$${Math.round(n / 1_000)}K`
+const num = (n?: number, d = 0) => n == null ? '—' : n.toLocaleString('es-PE', { maximumFractionDigits: d })
+
+/** Duración en semanas de la fase según el cronograma del proyecto. */
+function duracionFase(fase: string, cab: CabidaMin, fin: FinancieroMin): number | null {
+  const ids: Record<string, string[]> = {
+    excavacion:     ['excavacion', 'cimentacion'],
+    construccion:   ['casco', 'albanileria'],
+    acabados:       ['instalaciones', 'acabados', 'fachada'],
+    administracion: ['compra', 'proyecto', 'licencia', 'conformidad', 'titulacion', 'entrega'],
+  }
+  const keys = ids[fase]
+  if (!keys) return null
+  const { tareas } = generarCronograma(cab, fin)
+  const propias = tareas.filter((t) => keys.includes(t.id))
+  if (propias.length === 0) return null
+  const ini = Math.min(...propias.map((t) => t.inicio))
+  const fin_ = Math.max(...propias.map((t) => t.inicio + t.duracion - 1))
+  return fin_ - ini + 1
+}
+
+/** KPIs específicos de cada fase derivados del análisis del proyecto. */
+function statsDeFase(fase: string, a: Analisis): { label: string; value: string }[] {
+  const c = a.cabida
+  const f = a.financiero
+  const e = a.estructura
+  if (!c || !f) return []
+  const dur = duracionFase(fase, c, f)
+  const durStr = dur ? `${dur} semanas` : '—'
+
+  switch (fase) {
+    case 'demolicion': {
+      const costoDemo = f.costo_demolicion_usd ?? 0
+      const areaDemo = costoDemo > 0 ? costoDemo / 45 : 0 // motor usa 45 USD/m²
+      return costoDemo > 0
+        ? [
+            { label: 'Área a demoler', value: `${num(areaDemo)} m²` },
+            { label: 'Costo estimado', value: usd(costoDemo) },
+            { label: 'Tarifa motor C4', value: '$45 / m²' },
+          ]
+        : [{ label: 'Demolición', value: 'No aplica — terreno limpio' }]
+    }
+    case 'excavacion': {
+      const volumen = c.sotanos > 0 ? c.planta_libre * c.sotanos * 3.5 : 0
+      return [
+        { label: 'Sótanos', value: String(c.sotanos) },
+        { label: 'Vol. excavación est.', value: c.sotanos > 0 ? `~${num(volumen)} m³` : '—' },
+        { label: 'Estac. en sótano', value: String(c.estacionamientos_en_sotano ?? '—') },
+        { label: 'Duración (cronograma)', value: durStr },
+      ]
+    }
+    case 'construccion':
+      return [
+        { label: 'Pisos de vivienda', value: String(c.pisos_vivienda) },
+        { label: 'Área construida', value: `${num(c.area_construida_bruta)} m²` },
+        { label: 'Concreto / Acero', value: e ? `${num(e.concreto_total_m3, 1)} m³ · ${num(e.acero_total_ton, 1)} t` : '—' },
+        { label: 'Costo construcción', value: usd(f.costo_construccion_usd) },
+        { label: 'Duración (cronograma)', value: durStr },
+      ]
+    case 'acabados':
+      return [
+        { label: 'Departamentos', value: String(c.num_departamentos) },
+        { label: 'Área vendible', value: `${num(c.area_vendible_total)} m²` },
+        { label: 'Área prom. / depto', value: c.num_departamentos > 0 ? `${num(c.area_vendible_total / c.num_departamentos, 1)} m²` : '—' },
+        { label: 'Duración (cronograma)', value: durStr },
+      ]
+    case 'administracion':
+      return [
+        { label: 'Licencias + diseño', value: usd(f.costo_licencias_diseno_usd) },
+        { label: 'Titulación SUNARP', value: usd(f.costo_titulacion_usd) },
+        { label: 'Horizonte total', value: f.meses_proyecto ? `${f.meses_proyecto} meses` : '—' },
+        { label: 'Punto de equilibrio', value: f.punto_equilibrio_deptos ? `${f.punto_equilibrio_deptos} deptos` : '—' },
+      ]
+    default:
+      return []
+  }
+}
+
 export default function ProyectoFasePage() {
   const { id: proyectoId, fase } = useParams<{ id: string; fase: string }>()
   const token = useAuthStore((s) => s.token)
   const config = FASES_CONFIG[fase ?? '']
 
   const [tareas, setTareas] = useState<Tarea[]>([])
+  const [equipos, setEquipos] = useState<Equipo[]>([])
+  const [analisis, setAnalisis] = useState<Analisis>({})
   const [loading, setLoading] = useState(true)
   const [nuevaTarea, setNuevaTarea] = useState('')
   const [agregando, setAgregando] = useState(false)
@@ -110,17 +223,16 @@ export default function ProyectoFasePage() {
   useEffect(() => {
     if (!proyectoId || !fase) return
     setLoading(true)
+
+    // Tareas (+ seed por defecto la primera vez)
     fetch(`${API_BASE}/tareas-fase/${proyectoId}/${fase}`, { headers })
       .then((r) => r.json())
       .then(async (data: Tarea[]) => {
         if (data.length === 0 && config) {
-          // Seed tareas por defecto la primera vez
           const creadas: Tarea[] = []
           for (const texto of config.tareasDefault) {
             const r = await fetch(`${API_BASE}/tareas-fase/${proyectoId}/${fase}`, {
-              method: 'POST',
-              headers,
-              body: JSON.stringify({ texto }),
+              method: 'POST', headers, body: JSON.stringify({ texto }),
             })
             creadas.push(await r.json())
           }
@@ -130,6 +242,18 @@ export default function ProyectoFasePage() {
         }
       })
       .finally(() => setLoading(false))
+
+    // Equipos asignados a la fase (la IA los rellena con generar_proyecto)
+    fetch(`${API_BASE}/equipos-fase/${proyectoId}/${fase}`, { headers })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((d) => setEquipos(Array.isArray(d) ? d : []))
+      .catch(() => setEquipos([]))
+
+    // Análisis del proyecto → KPIs de la fase
+    fetch(`${API_BASE}/chat/${proyectoId}/analisis`, { headers })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setAnalisis(d ?? {}))
+      .catch(() => setAnalisis({}))
   }, [proyectoId, fase])
 
   if (!config) return (
@@ -141,6 +265,7 @@ export default function ProyectoFasePage() {
   const Icon = config.icon
   const completadas = tareas.filter((t) => t.estado === 'completada').length
   const avance = tareas.length ? Math.round((completadas / tareas.length) * 100) : 0
+  const stats = statsDeFase(fase!, analisis)
 
   async function avanzarEstado(tarea: Tarea) {
     const nuevoEstado = ESTADO_SIGUIENTE[tarea.estado] ?? 'pendiente'
@@ -170,6 +295,11 @@ export default function ProyectoFasePage() {
     await fetch(`${API_BASE}/tareas-fase/${id}`, { method: 'DELETE', headers })
   }
 
+  async function eliminarEquipo(id: string) {
+    setEquipos((prev) => prev.filter((e) => e.id !== id))
+    await fetch(`${API_BASE}/equipos-fase/${id}`, { method: 'DELETE', headers })
+  }
+
   return (
     <div className="h-full overflow-y-auto p-6 space-y-5">
       {/* Header */}
@@ -192,79 +322,163 @@ export default function ProyectoFasePage() {
         <div className="bg-blue-600 h-2 rounded-full transition-all duration-500" style={{ width: `${avance}%` }} />
       </div>
 
-      {/* Lista */}
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
-          <p className="text-sm font-semibold text-slate-700">Tareas</p>
-          <span className="text-xs text-slate-400">{completadas} completadas</span>
+      {/* KPIs de la fase (derivados del análisis) */}
+      {stats.length > 0 && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-2">
+          {stats.map((s) => (
+            <div key={s.label} className="bg-white rounded-xl border border-slate-200 px-4 py-3">
+              <p className="text-[11px] text-slate-400 mb-0.5">{s.label}</p>
+              <p className="text-sm font-bold text-slate-800">{s.value}</p>
+            </div>
+          ))}
         </div>
+      )}
+      {stats.length === 0 && (
+        <div className="flex items-center gap-2 text-xs text-slate-400 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
+          <Sparkles className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+          Ejecuta el análisis con el Asistente C4 para ver los datos clave de esta fase (volúmenes, costos, duración).
+        </div>
+      )}
 
-        {loading ? (
-          <div className="flex items-center justify-center py-10 text-slate-400">
-            <Loader2 className="w-4 h-4 animate-spin mr-2" />
-            <span className="text-sm">Cargando...</span>
+      <div className="grid lg:grid-cols-5 gap-5 items-start">
+        {/* Checklist de tareas */}
+        <div className="lg:col-span-3 bg-white rounded-2xl border border-slate-200 overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
+            <p className="text-sm font-semibold text-slate-700">Plan de ejecución</p>
+            <span className="text-xs text-slate-400">{completadas} completadas</span>
           </div>
-        ) : (
-          <div className="divide-y divide-slate-50">
-            {tareas.map((tarea) => (
-              <div key={tarea.id} className="flex items-center gap-3 px-5 py-3.5 hover:bg-slate-50 transition-colors group">
-                <button onClick={() => avanzarEstado(tarea)} className="shrink-0">
-                  {guardando === tarea.id
-                    ? <Loader2 className="w-4 h-4 animate-spin text-blue-400" />
-                    : tarea.estado === 'completada'
-                      ? <CheckCircle2 className="w-4 h-4 text-green-500" />
-                      : tarea.estado === 'en_proceso'
-                        ? <Clock className="w-4 h-4 text-blue-500" />
-                        : <Circle className="w-4 h-4 text-slate-300" />
-                  }
-                </button>
-                <span className={`text-sm flex-1 ${tarea.estado === 'completada' ? 'line-through text-slate-400' : 'text-slate-700'}`}>
-                  {tarea.texto}
-                </span>
-                <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium hidden group-hover:inline-block ${
-                  tarea.estado === 'completada' ? 'bg-slate-100 text-slate-500' :
-                  tarea.estado === 'en_proceso' ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-400'
-                }`}>
-                  {tarea.estado === 'pendiente' ? 'Iniciar' : tarea.estado === 'en_proceso' ? 'Completar' : 'Reabrir'}
-                </span>
-                <button
-                  onClick={() => eliminarTarea(tarea.id)}
-                  className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-400 transition-all p-1 rounded"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
 
-        <div className="px-5 py-3 border-t border-slate-100">
-          {agregando ? (
-            <div className="flex items-center gap-2">
-              <input
-                autoFocus
-                value={nuevaTarea}
-                onChange={(e) => setNuevaTarea(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') agregarTarea()
-                  if (e.key === 'Escape') { setAgregando(false); setNuevaTarea('') }
-                }}
-                placeholder="Nombre de la tarea..."
-                className="flex-1 text-sm text-slate-700 border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-              />
-              <button onClick={agregarTarea} className="text-xs bg-blue-600 text-white px-3 py-2 rounded-xl hover:bg-blue-500 transition-colors">
-                Agregar
-              </button>
-              <button onClick={() => { setAgregando(false); setNuevaTarea('') }} className="text-xs text-slate-400 px-2 py-2">
-                Cancelar
-              </button>
+          {loading ? (
+            <div className="flex items-center justify-center py-10 text-slate-400">
+              <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              <span className="text-sm">Cargando...</span>
             </div>
           ) : (
-            <button onClick={() => setAgregando(true)} className="flex items-center gap-2 text-slate-400 hover:text-blue-500 transition-colors text-sm">
-              <Plus className="w-4 h-4" />
-              Agregar tarea
-            </button>
+            <div className="divide-y divide-slate-50">
+              {tareas.map((tarea) => (
+                <div key={tarea.id} className="flex items-center gap-3 px-5 py-3.5 hover:bg-slate-50 transition-colors group">
+                  <button onClick={() => avanzarEstado(tarea)} className="shrink-0">
+                    {guardando === tarea.id
+                      ? <Loader2 className="w-4 h-4 animate-spin text-blue-400" />
+                      : tarea.estado === 'completada'
+                        ? <CheckCircle2 className="w-4 h-4 text-green-500" />
+                        : tarea.estado === 'en_proceso'
+                          ? <Clock className="w-4 h-4 text-blue-500" />
+                          : <Circle className="w-4 h-4 text-slate-300" />
+                    }
+                  </button>
+                  <span className={`text-sm flex-1 ${tarea.estado === 'completada' ? 'line-through text-slate-400' : 'text-slate-700'}`}>
+                    {tarea.texto}
+                  </span>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium hidden group-hover:inline-block ${
+                    tarea.estado === 'completada' ? 'bg-slate-100 text-slate-500' :
+                    tarea.estado === 'en_proceso' ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-400'
+                  }`}>
+                    {tarea.estado === 'pendiente' ? 'Iniciar' : tarea.estado === 'en_proceso' ? 'Completar' : 'Reabrir'}
+                  </span>
+                  <button
+                    onClick={() => eliminarTarea(tarea.id)}
+                    className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-400 transition-all p-1 rounded"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
           )}
+
+          <div className="px-5 py-3 border-t border-slate-100">
+            {agregando ? (
+              <div className="flex items-center gap-2">
+                <input
+                  autoFocus
+                  value={nuevaTarea}
+                  onChange={(e) => setNuevaTarea(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') agregarTarea()
+                    if (e.key === 'Escape') { setAgregando(false); setNuevaTarea('') }
+                  }}
+                  placeholder="Nombre de la tarea..."
+                  className="flex-1 text-sm text-slate-700 border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                />
+                <button onClick={agregarTarea} className="text-xs bg-blue-600 text-white px-3 py-2 rounded-xl hover:bg-blue-500 transition-colors">
+                  Agregar
+                </button>
+                <button onClick={() => { setAgregando(false); setNuevaTarea('') }} className="text-xs text-slate-400 px-2 py-2">
+                  Cancelar
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setAgregando(true)}
+                className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-blue-500 transition-colors font-medium"
+              >
+                <Plus className="w-3.5 h-3.5" /> Agregar tarea
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Maquinaria y equipos */}
+        <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 overflow-hidden">
+          <div className="flex items-center gap-2 px-5 py-3 border-b border-slate-100">
+            <Truck className="w-4 h-4 text-slate-400" />
+            <p className="text-sm font-semibold text-slate-700">Maquinaria y equipos</p>
+          </div>
+
+          {equipos.length === 0 ? (
+            <div className="px-5 py-8 text-center">
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Sin equipos asignados a esta fase.<br />
+                El Asistente C4 los asigna automáticamente al generar el proyecto, o agrégalos desde el chat.
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-50">
+              {equipos.map((eq) => {
+                const EqIcon = TIPO_EQUIPO_ICON[eq.tipo] ?? Wrench
+                return (
+                  <div key={eq.id} className="px-5 py-3.5 hover:bg-slate-50 transition-colors group">
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center shrink-0 mt-0.5">
+                        <EqIcon className="w-4 h-4 text-slate-500" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-700 leading-tight">{eq.nombre}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-medium uppercase tracking-wide">
+                            {eq.tipo.replace('_', ' ')}
+                          </span>
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                            eq.estado === 'en_obra' ? 'bg-green-50 text-green-600' : 'bg-blue-50 text-blue-600'
+                          }`}>
+                            {eq.estado === 'disponible' ? 'Recomendado' : eq.estado}
+                          </span>
+                        </div>
+                        {eq.notas && (
+                          <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed">{eq.notas}</p>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => eliminarEquipo(eq.id)}
+                        className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-400 transition-all p-1 rounded shrink-0"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {/* Nota cronograma */}
+          <div className="px-5 py-3 border-t border-slate-100 flex items-center gap-1.5">
+            <CalendarRange className="w-3.5 h-3.5 text-slate-300 shrink-0" />
+            <p className="text-[11px] text-slate-400">
+              La duración de la fase sale del Gantt del proyecto (pestaña Análisis → Cronograma).
+            </p>
+          </div>
         </div>
       </div>
     </div>
