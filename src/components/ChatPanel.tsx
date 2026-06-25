@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import {
   Send, Mic, Paperclip, Sparkles, Loader2,
-  CheckCircle2, Download, FileText, X, Plus, Trash2, Map,
+  CheckCircle2, Download, FileText, X, Plus, Trash2, Map, Volume2, VolumeX,
 } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 import { useChatStore } from '../store/chatStore'
@@ -34,6 +34,60 @@ export default function ChatPanel({ proyectoId }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const docInputRef = useRef<HTMLInputElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
+
+  // ── Voz: dictado (Web Speech) + lectura de respuestas (SpeechSynthesis) ──
+  const SR = (typeof window !== 'undefined') && ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition)
+  const ttsOk = typeof window !== 'undefined' && 'speechSynthesis' in window
+  const [escuchando, setEscuchando] = useState(false)
+  const [vozActiva, setVozActiva] = useState(false)
+  const recognitionRef = useRef<any>(null)
+  const baseRef = useRef('')
+  const ultimoHabladoRef = useRef<number | null>(null)
+
+  function toggleMic() {
+    if (!SR) return
+    if (escuchando) { recognitionRef.current?.stop(); return }
+    const rec = new SR()
+    rec.lang = 'es-PE'; rec.continuous = true; rec.interimResults = true
+    baseRef.current = input ? input.trim() + ' ' : ''
+    rec.onresult = (e: any) => {
+      let interim = '', finals = ''
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const t = e.results[i][0].transcript
+        if (e.results[i].isFinal) finals += t + ' '; else interim += t
+      }
+      if (finals) baseRef.current += finals
+      setInput((baseRef.current + interim).replace(/\s+/g, ' ').trimStart())
+    }
+    rec.onend = () => setEscuchando(false)
+    rec.onerror = () => setEscuchando(false)
+    recognitionRef.current = rec
+    rec.start(); setEscuchando(true)
+  }
+
+  function limpiarMd(s: string) {
+    return s.replace(/[#*_>`~]/g, '').replace(/^\s*[-·]\s*/gm, '').replace(/\[(.*?)\]\(.*?\)/g, '$1').replace(/\s+/g, ' ').trim()
+  }
+  function toggleVoz() {
+    if (vozActiva) { window.speechSynthesis?.cancel(); setVozActiva(false); return }
+    // al activar, no leer la respuesta ya existente — solo las próximas
+    const last = [...mensajes].reverse().find((m) => m.rol === 'assistant')
+    ultimoHabladoRef.current = last ? last.id : null
+    setVozActiva(true)
+  }
+
+  // Leer en voz la última respuesta cuando termina de generarse
+  useEffect(() => {
+    if (!vozActiva || !ttsOk) return
+    const last = [...mensajes].reverse().find((m) => m.rol === 'assistant')
+    if (last && !last.streaming && last.contenido && last.id !== ultimoHabladoRef.current) {
+      ultimoHabladoRef.current = last.id
+      const u = new SpeechSynthesisUtterance(limpiarMd(last.contenido).slice(0, 1200))
+      u.lang = 'es-PE'; u.rate = 1.05
+      window.speechSynthesis.cancel()
+      window.speechSynthesis.speak(u)
+    }
+  }, [mensajes, vozActiva, ttsOk])
 
   // Carga la sesión del proyecto (el store no reinicia si ya es el mismo)
   useEffect(() => { cargarSesion(proyectoId) }, [proyectoId, cargarSesion])
@@ -89,6 +143,7 @@ export default function ChatPanel({ proyectoId }: Props) {
 
   function handleSend() {
     if (!input.trim() || sending) return
+    if (escuchando) recognitionRef.current?.stop()
     const userMsg = input.trim()
     setInput('')
     const adjunto = archivo ?? undefined
@@ -126,12 +181,23 @@ export default function ChatPanel({ proyectoId }: Props) {
             </p>
           </div>
         </div>
-        <button
-          onClick={() => setOpen(false)}
-          className="w-7 h-7 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors"
-        >
-          <X className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-1">
+          {ttsOk && (
+            <button
+              onClick={toggleVoz}
+              title={vozActiva ? 'Desactivar lectura por voz' : 'Que la IA lea las respuestas en voz'}
+              className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${vozActiva ? 'text-blue-600 bg-blue-50' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'}`}
+            >
+              {vozActiva ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+            </button>
+          )}
+          <button
+            onClick={() => setOpen(false)}
+            className="w-7 h-7 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Mensajes */}
@@ -335,8 +401,18 @@ export default function ChatPanel({ proyectoId }: Props) {
             className="flex-1 bg-transparent text-sm text-slate-700 placeholder:text-slate-400 outline-none resize-none"
           />
           <div className="flex items-center gap-1.5 shrink-0">
-            <button className="text-slate-400 hover:text-slate-600 transition-colors">
-              <Mic className="w-4 h-4" />
+            <button
+              onClick={toggleMic}
+              disabled={!SR}
+              title={!SR ? 'Tu navegador no soporta dictado por voz (usa Chrome/Edge)' : escuchando ? 'Detener dictado' : 'Dictar por voz'}
+              className={`transition-colors disabled:opacity-30 ${escuchando ? 'text-red-500' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              {escuchando ? (
+                <span className="relative flex items-center justify-center">
+                  <span className="absolute w-5 h-5 rounded-full bg-red-400/40 animate-ping" />
+                  <Mic className="w-4 h-4 relative" />
+                </span>
+              ) : <Mic className="w-4 h-4" />}
             </button>
             <button
               onClick={handleSend}
