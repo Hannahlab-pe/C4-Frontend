@@ -35,59 +35,83 @@ export default function ChatPanel({ proyectoId }: Props) {
   const docInputRef = useRef<HTMLInputElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  // ── Voz: dictado (Web Speech) + lectura de respuestas (SpeechSynthesis) ──
-  const SR = (typeof window !== 'undefined') && ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition)
-  const ttsOk = typeof window !== 'undefined' && 'speechSynthesis' in window
-  const [escuchando, setEscuchando] = useState(false)
+  // ── Voz: dictado (graba → OpenAI STT) + lectura de respuestas (OpenAI TTS) ──
+  const micOk = typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia
+  const [escuchando, setEscuchando] = useState(false)   // grabando
+  const [transcribiendo, setTranscribiendo] = useState(false)
   const [vozActiva, setVozActiva] = useState(false)
-  const recognitionRef = useRef<any>(null)
-  const baseRef = useRef('')
+  const mediaRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([])
+  const audioRef = useRef<HTMLAudioElement | null>(null)
   const ultimoHabladoRef = useRef<number | null>(null)
-
-  function toggleMic() {
-    if (!SR) return
-    if (escuchando) { recognitionRef.current?.stop(); return }
-    const rec = new SR()
-    rec.lang = 'es-PE'; rec.continuous = true; rec.interimResults = true
-    baseRef.current = input ? input.trim() + ' ' : ''
-    rec.onresult = (e: any) => {
-      let interim = '', finals = ''
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const t = e.results[i][0].transcript
-        if (e.results[i].isFinal) finals += t + ' '; else interim += t
-      }
-      if (finals) baseRef.current += finals
-      setInput((baseRef.current + interim).replace(/\s+/g, ' ').trimStart())
-    }
-    rec.onend = () => setEscuchando(false)
-    rec.onerror = () => setEscuchando(false)
-    recognitionRef.current = rec
-    rec.start(); setEscuchando(true)
-  }
 
   function limpiarMd(s: string) {
     return s.replace(/[#*_>`~]/g, '').replace(/^\s*[-·]\s*/gm, '').replace(/\[(.*?)\]\(.*?\)/g, '$1').replace(/\s+/g, ' ').trim()
   }
+  const blobToB64 = (b: Blob) => new Promise<string>((res, rej) => {
+    const fr = new FileReader(); fr.onload = () => res(String(fr.result).split(',')[1] ?? ''); fr.onerror = rej; fr.readAsDataURL(b)
+  })
+
+  async function toggleMic() {
+    if (escuchando) { mediaRef.current?.stop(); return }
+    if (!micOk) return
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mr = new MediaRecorder(stream)
+      chunksRef.current = []
+      mr.ondataavailable = (e) => { if (e.data.size) chunksRef.current.push(e.data) }
+      mr.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop())
+        setEscuchando(false)
+        const blob = new Blob(chunksRef.current, { type: mr.mimeType || 'audio/webm' })
+        if (!blob.size) return
+        setTranscribiendo(true)
+        try {
+          const audioBase64 = await blobToB64(blob)
+          const r = await fetch(`${API_BASE}/chat/transcribir`, {
+            method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ audioBase64, mimeType: blob.type }),
+          })
+          const d = await r.json()
+          if (d.texto) setInput((prev) => (prev ? prev.trim() + ' ' : '') + d.texto)
+        } finally { setTranscribiendo(false) }
+      }
+      mediaRef.current = mr
+      mr.start(); setEscuchando(true)
+    } catch { setEscuchando(false) } // permiso denegado
+  }
+
   function toggleVoz() {
-    if (vozActiva) { window.speechSynthesis?.cancel(); setVozActiva(false); return }
-    // al activar, no leer la respuesta ya existente — solo las próximas
+    if (vozActiva) { audioRef.current?.pause(); setVozActiva(false); return }
     const last = [...mensajes].reverse().find((m) => m.rol === 'assistant')
-    ultimoHabladoRef.current = last ? last.id : null
+    ultimoHabladoRef.current = last ? last.id : null // no re-leer lo existente
     setVozActiva(true)
+  }
+
+  async function reproducirVoz(texto: string) {
+    try {
+      const r = await fetch(`${API_BASE}/chat/voz`, {
+        method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ texto: limpiarMd(texto).slice(0, 3000) }),
+      })
+      if (!r.ok) return
+      const blob = await r.blob()
+      audioRef.current?.pause()
+      const a = new Audio(URL.createObjectURL(blob))
+      audioRef.current = a
+      a.play().catch(() => {})
+    } catch { /* noop */ }
   }
 
   // Leer en voz la última respuesta cuando termina de generarse
   useEffect(() => {
-    if (!vozActiva || !ttsOk) return
+    if (!vozActiva) return
     const last = [...mensajes].reverse().find((m) => m.rol === 'assistant')
     if (last && !last.streaming && last.contenido && last.id !== ultimoHabladoRef.current) {
       ultimoHabladoRef.current = last.id
-      const u = new SpeechSynthesisUtterance(limpiarMd(last.contenido).slice(0, 1200))
-      u.lang = 'es-PE'; u.rate = 1.05
-      window.speechSynthesis.cancel()
-      window.speechSynthesis.speak(u)
+      reproducirVoz(last.contenido)
     }
-  }, [mensajes, vozActiva, ttsOk])
+  }, [mensajes, vozActiva])
 
   // Carga la sesión del proyecto (el store no reinicia si ya es el mismo)
   useEffect(() => { cargarSesion(proyectoId) }, [proyectoId, cargarSesion])
@@ -143,7 +167,7 @@ export default function ChatPanel({ proyectoId }: Props) {
 
   function handleSend() {
     if (!input.trim() || sending) return
-    if (escuchando) recognitionRef.current?.stop()
+    if (escuchando) mediaRef.current?.stop()
     const userMsg = input.trim()
     setInput('')
     const adjunto = archivo ?? undefined
@@ -182,15 +206,13 @@ export default function ChatPanel({ proyectoId }: Props) {
           </div>
         </div>
         <div className="flex items-center gap-1">
-          {ttsOk && (
-            <button
-              onClick={toggleVoz}
-              title={vozActiva ? 'Desactivar lectura por voz' : 'Que la IA lea las respuestas en voz'}
-              className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${vozActiva ? 'text-blue-600 bg-blue-50' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'}`}
-            >
-              {vozActiva ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-            </button>
-          )}
+          <button
+            onClick={toggleVoz}
+            title={vozActiva ? 'Desactivar lectura por voz' : 'Que la IA lea las respuestas en voz'}
+            className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${vozActiva ? 'text-blue-600 bg-blue-50' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'}`}
+          >
+            {vozActiva ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+          </button>
           <button
             onClick={() => setOpen(false)}
             className="w-7 h-7 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors"
@@ -403,11 +425,13 @@ export default function ChatPanel({ proyectoId }: Props) {
           <div className="flex items-center gap-1.5 shrink-0">
             <button
               onClick={toggleMic}
-              disabled={!SR}
-              title={!SR ? 'Tu navegador no soporta dictado por voz (usa Chrome/Edge)' : escuchando ? 'Detener dictado' : 'Dictar por voz'}
-              className={`transition-colors disabled:opacity-30 ${escuchando ? 'text-red-500' : 'text-slate-400 hover:text-slate-600'}`}
+              disabled={!micOk || transcribiendo}
+              title={!micOk ? 'Tu navegador no soporta micrófono' : transcribiendo ? 'Transcribiendo...' : escuchando ? 'Detener y transcribir' : 'Dictar por voz'}
+              className={`transition-colors disabled:opacity-40 ${escuchando ? 'text-red-500' : 'text-slate-400 hover:text-slate-600'}`}
             >
-              {escuchando ? (
+              {transcribiendo ? (
+                <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+              ) : escuchando ? (
                 <span className="relative flex items-center justify-center">
                   <span className="absolute w-5 h-5 rounded-full bg-red-400/40 animate-ping" />
                   <Mic className="w-4 h-4 relative" />
