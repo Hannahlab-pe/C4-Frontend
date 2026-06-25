@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus, MapPin, ChevronRight, Loader2 } from 'lucide-react'
+import { MapPin, ChevronRight, Loader2, Building2, Hammer, CheckCircle2, Layers, ArrowRight } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import api from '../lib/api'
@@ -12,20 +12,24 @@ interface Proyecto {
   createdAt: string
 }
 
-const PHASE_IMGS = [
-  '/phases/construccion.jpg',
-  '/phases/excavacion.jpg',
-  '/phases/acabados.jpg',
-  '/phases/demolicion.jpg',
-  '/phases/administracion.jpg',
-]
+function fmtFecha(iso?: string): string {
+  if (!iso) return ''
+  try { return new Date(iso).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' }) }
+  catch { return '' }
+}
+
+function estadoCfg(estado?: string) {
+  const e = (estado ?? 'activo').toLowerCase()
+  if (e === 'completado') return { txt: 'Completado', cls: 'bg-emerald-50 text-emerald-600 border-emerald-200' }
+  if (e === 'borrador')   return { txt: 'Borrador',   cls: 'bg-slate-100 text-slate-500 border-slate-200' }
+  return { txt: 'Activo', cls: 'bg-blue-50 text-blue-600 border-blue-200' }
+}
 
 export default function DashboardPage() {
   const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
   const [proyectos, setProyectos] = useState<Proyecto[]>([])
   const [loading, setLoading] = useState(true)
-  const [slideIdx, setSlideIdx] = useState(0)
 
   useEffect(() => {
     api.get('/proyectos')
@@ -34,99 +38,65 @@ export default function DashboardPage() {
       .finally(() => setLoading(false))
   }, [])
 
-  useEffect(() => {
-    const t = setInterval(() => setSlideIdx((i) => (i + 1) % PHASE_IMGS.length), 4500)
-    return () => clearInterval(t)
-  }, [])
-
-  const firstName = user?.nombre?.split(' ')[0] ?? 'Ing.'
+  const fechaHoy = new Date().toLocaleDateString('es-PE', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+  })
 
   const stats = [
-    { label: 'Proyectos totales', value: proyectos.length },
-    { label: 'En ejecución',      value: proyectos.filter((p) => p.estado === 'ejecucion').length },
-    { label: 'En proceso',        value: proyectos.filter((p) => !p.estado || p.estado === 'proceso').length },
-    { label: 'Completados',       value: proyectos.filter((p) => p.estado === 'completado').length },
+    { label: 'Proyectos totales', value: proyectos.length, icon: Layers },
+    { label: 'Activos',           value: proyectos.filter((p) => !p.estado || ['activo', 'proceso', 'ejecucion'].includes(p.estado)).length, icon: Hammer },
+    { label: 'Completados',       value: proyectos.filter((p) => p.estado === 'completado').length, icon: CheckCircle2 },
+    { label: 'Distritos',         value: new Set(proyectos.map((p) => p.distrito).filter(Boolean)).size, icon: MapPin },
   ]
 
+  const recientes = [...proyectos]
+    .sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))
+    .slice(0, 3)
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
 
-      {/* ── 1. HERO ─────────────────────────────────────────────── */}
-      <div className="relative rounded-2xl overflow-hidden h-48">
-        {PHASE_IMGS.map((src, i) => (
-          <div
-            key={src}
-            className="absolute inset-0 transition-opacity duration-1000"
-            style={{
-              backgroundImage: `url(${src})`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center 40%',
-              opacity: i === slideIdx ? 1 : 0,
-            }}
-          />
-        ))}
-        <div className="absolute inset-0 bg-linear-to-r from-black/90 via-black/60 to-black/20" />
-
-        <div className="relative z-10 h-full flex flex-col justify-between p-7">
-          <div>
-            <p className="text-white/40 text-[10px] font-semibold uppercase tracking-[0.22em] mb-1.5">
-              Panel de control
-            </p>
-            <h1 className="text-2xl font-black text-white tracking-tight">
-              Bienvenido, {firstName}
-            </h1>
-            <p className="text-white/40 text-sm mt-1">
-              {proyectos.length === 0
-                ? 'Crea tu primer proyecto para comenzar'
-                : `${proyectos.length} proyecto${proyectos.length !== 1 ? 's' : ''} en tu portafolio`}
-            </p>
-          </div>
-
-          {/* Slide dots */}
-          <div className="flex items-center gap-1.5">
-            {PHASE_IMGS.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => setSlideIdx(i)}
-                className={`h-px rounded-full transition-all duration-300 ${
-                  i === slideIdx ? 'w-5 bg-white' : 'w-2 bg-white/25'
-                }`}
-              />
-            ))}
-          </div>
-        </div>
-
-        <button
-          onClick={() => navigate('/proyectos')}
-          className="absolute top-6 right-6 z-10 flex items-center gap-1.5 bg-white text-slate-900
-            text-xs font-semibold px-3.5 py-2 rounded-lg hover:bg-slate-100 transition-colors shadow-lg"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          Nuevo proyecto
-        </button>
+      {/* ── Header limpio ── */}
+      <div>
+        <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-[0.2em] mb-1 first-letter:uppercase">
+          {fechaHoy.charAt(0).toUpperCase() + fechaHoy.slice(1)}
+        </p>
+        <h1 className="text-3xl font-black text-slate-900 tracking-tight">
+          Bienvenido, {user?.nombre ?? 'Ingeniero'}
+        </h1>
+        <p className="text-sm text-slate-400 mt-1">
+          {proyectos.length === 0
+            ? 'Aún no tienes proyectos en tu portafolio.'
+            : `Tienes ${proyectos.length} proyecto${proyectos.length !== 1 ? 's' : ''} en tu portafolio.`}
+        </p>
       </div>
 
-      {/* ── 2. STATS ────────────────────────────────────────────── */}
+      {/* ── Métricas ── */}
       {!loading && (
-        <div className="grid grid-cols-4 gap-3">
-          {stats.map(({ label, value }) => (
-            <div key={label} className="bg-white rounded-xl border border-slate-100 px-6 py-4">
-              <p className="text-3xl font-black text-slate-800 tabular-nums leading-none">{value}</p>
-              <p className="text-slate-400 text-xs mt-1.5">{label}</p>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {stats.map(({ label, value, icon: Icon }) => (
+            <div key={label} className="bg-white rounded-2xl border border-slate-200 px-5 py-4 flex items-center justify-between">
+              <div>
+                <p className="text-[11px] text-slate-400 uppercase tracking-wider mb-1">{label}</p>
+                <p className="text-2xl font-black text-slate-900 tabular-nums leading-none">{value}</p>
+              </div>
+              <div className="w-9 h-9 rounded-xl bg-slate-50 flex items-center justify-center shrink-0">
+                <Icon className="w-4 h-4 text-slate-400" />
+              </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* ── 3. PROYECTOS ────────────────────────────────────────── */}
+      {/* ── Proyectos recientes ── */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold text-slate-700">Mis proyectos</h2>
+          <h2 className="text-sm font-bold text-slate-700">Proyectos recientes</h2>
           <button
             onClick={() => navigate('/proyectos')}
-            className="text-xs text-blue-600 hover:text-blue-500 font-medium transition-colors"
+            className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-900 font-medium transition-colors"
           >
-            Ver todos →
+            Ver todos los proyectos <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
 
@@ -134,74 +104,53 @@ export default function DashboardPage() {
           <div className="flex items-center justify-center h-36">
             <Loader2 className="w-5 h-5 text-slate-300 animate-spin" />
           </div>
-        ) : proyectos.length === 0 ? (
-          <div
-            className="relative rounded-2xl overflow-hidden h-44 flex items-center justify-center cursor-pointer group"
-            style={{ backgroundImage: "url('/phases/excavacion.jpg')", backgroundSize: 'cover', backgroundPosition: 'center' }}
-            onClick={() => navigate('/proyectos')}
-          >
-            <div className="absolute inset-0 bg-black/65 group-hover:bg-black/55 transition-colors" />
-            <div className="relative z-10 text-center">
-              <div className="w-12 h-12 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center mx-auto mb-3">
-                <Plus className="w-6 h-6 text-white" />
-              </div>
-              <p className="text-white font-semibold text-sm">Crear primer proyecto</p>
-              <p className="text-white/50 text-xs mt-1">Comienza tu análisis de pre-inversión</p>
+        ) : recientes.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-slate-200 px-6 py-12 text-center">
+            <div className="w-11 h-11 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-3">
+              <Building2 className="w-5 h-5 text-slate-400" />
             </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-3 gap-3">
-            {proyectos.map((p, i) => (
-              <button
-                key={p.id}
-                onClick={() => navigate(`/proyectos/${p.id}/panel`)}
-                className="relative overflow-hidden rounded-xl h-40 text-left group
-                  hover:-translate-y-1 hover:shadow-2xl hover:shadow-black/25
-                  transition-all duration-300"
-                style={{
-                  backgroundImage: `url(${PHASE_IMGS[i % PHASE_IMGS.length]})`,
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center',
-                }}
-              >
-                <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/35 to-transparent
-                  group-hover:from-black/70 transition-all duration-300" />
-
-                <span className="absolute top-3 left-4 font-mono text-[10px] text-white/35 tracking-[0.2em]">
-                  {String(i + 1).padStart(2, '0')}
-                </span>
-
-                <span className="absolute top-3 right-3 text-[10px] font-medium text-white/55
-                  bg-white/10 backdrop-blur-sm border border-white/10 rounded-full px-2 py-0.5 uppercase tracking-wide">
-                  {p.estado ?? 'Activo'}
-                </span>
-
-                <div className="absolute bottom-0 left-0 right-0 p-4 z-10">
-                  <p className="text-sm font-bold text-white leading-tight truncate">{p.nombre}</p>
-                  <div className="flex items-center justify-between mt-1">
-                    {p.distrito ? (
-                      <span className="text-[11px] text-white/55 flex items-center gap-1">
-                        <MapPin className="w-2.5 h-2.5" />{p.distrito}
-                      </span>
-                    ) : <span />}
-                    <ChevronRight className="w-3.5 h-3.5 text-white/35 group-hover:text-white/70
-                      group-hover:translate-x-0.5 transition-all duration-150" />
-                  </div>
-                </div>
-              </button>
-            ))}
-
+            <p className="text-sm font-medium text-slate-600">Sin proyectos todavía</p>
+            <p className="text-xs text-slate-400 mt-1">Crea tu primer proyecto desde el panel de Proyectos.</p>
             <button
               onClick={() => navigate('/proyectos')}
-              className="rounded-xl h-40 border border-dashed border-slate-200
-                flex flex-col items-center justify-center gap-2
-                hover:border-slate-300 hover:bg-slate-50 transition-all duration-200"
+              className="mt-4 inline-flex items-center gap-1.5 text-xs font-medium text-white bg-slate-900 hover:bg-slate-700 px-4 py-2 rounded-xl transition-colors"
             >
-              <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center">
-                <Plus className="w-3.5 h-3.5 text-slate-400" />
-              </div>
-              <p className="text-xs font-medium text-slate-400">Nuevo proyecto</p>
+              Ir a Proyectos <ArrowRight className="w-3.5 h-3.5" />
             </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {recientes.map((p) => {
+              const est = estadoCfg(p.estado)
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => navigate(`/proyectos/${p.id}/panel`)}
+                  className="bg-white rounded-2xl border border-slate-200 p-5 text-left group flex flex-col
+                    hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-200/70 hover:border-blue-200
+                    transition-all duration-300"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="text-xl font-black text-slate-900 leading-snug tracking-tight line-clamp-2 flex-1">{p.nombre}</p>
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border shrink-0 mt-1 ${est.cls}`}>
+                      {est.txt}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 mt-2.5">
+                    <span className="text-xs text-slate-500 flex items-center gap-1">
+                      <MapPin className="w-3 h-3 text-slate-400" /> {p.distrito || 'Sin distrito'}
+                    </span>
+                    <span className="text-xs text-slate-300">·</span>
+                    <span className="text-xs text-slate-400">{fmtFecha(p.createdAt)}</span>
+                  </div>
+                  <div className="flex items-center justify-end mt-auto pt-4">
+                    <span className="flex items-center gap-1 text-[11px] font-medium text-slate-400 group-hover:text-blue-500 transition-colors">
+                      Abrir panel <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                    </span>
+                  </div>
+                </button>
+              )
+            })}
           </div>
         )}
       </div>

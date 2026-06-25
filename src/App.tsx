@@ -6,7 +6,7 @@ import DashboardPage from './pages/DashboardPage'
 import ProyectosPage from './pages/ProyectosPage'
 import ProyectoPanelPage from './pages/ProyectoPanelPage'
 import ProyectoFasePage from './pages/ProyectoFasePage'
-import ExcavacionPage from './pages/ExcavacionPage'
+import EtapaDetallePage from './pages/EtapaDetallePage'
 import AnalisisPage from './pages/AnalisisPage'
 import CronogramaPage from './pages/CronogramaPage'
 import KnowledgeBasePage from './pages/KnowledgeBasePage'
@@ -42,9 +42,9 @@ export default function App() {
           <Route index element={<ProyectoPanelPage />} />
           <Route path="analisis" element={<AnalisisPage />} />
           <Route path="cronograma" element={<CronogramaPage />} />
-          <Route path="excavacion" element={<ExcavacionPage />} />
           <Route path="configuracion" element={<ProyectoConfigPage />} />
           <Route path=":fase" element={<ProyectoFasePage />} />
+          <Route path=":fase/:etapa" element={<EtapaDetallePage />} />
         </Route>
 
         {/* Redirect viejo link directo */}

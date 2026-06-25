@@ -2,6 +2,7 @@ import { Bell, Search } from 'lucide-react'
 import { useLocation } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import api from '../lib/api'
+import { useAuthStore } from '../store/authStore'
 
 const STATIC_TITLES: Record<string, string> = {
   '/dashboard':        'Dashboard',
@@ -10,6 +11,7 @@ const STATIC_TITLES: Record<string, string> = {
 
 export default function Header() {
   const { pathname } = useLocation()
+  const user = useAuthStore((s) => s.user)
   const [proyectoNombre, setProyectoNombre] = useState<string | null>(null)
 
   const proyectoIdMatch = pathname.match(/^\/proyectos\/([^/]+)/)
@@ -47,6 +49,19 @@ export default function Header() {
           <Bell className="w-4 h-4 text-slate-500" />
           <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-blue-500 rounded-full" />
         </button>
+
+        {/* Usuario */}
+        <div className="flex items-center gap-2.5 pl-3 ml-1 border-l border-slate-200">
+          <div className="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center shrink-0">
+            <span className="text-white text-xs font-bold">
+              {user?.nombre?.charAt(0)?.toUpperCase() ?? 'U'}
+            </span>
+          </div>
+          <div className="leading-tight hidden sm:block">
+            <p className="text-xs font-semibold text-slate-800 truncate max-w-40">{user?.nombre ?? 'Usuario'}</p>
+            <p className="text-[10px] text-slate-400 capitalize">{user?.rol}</p>
+          </div>
+        </div>
       </div>
     </header>
   )

@@ -1,10 +1,11 @@
-import { useState, useRef, useCallback } from 'react'
+import { useRef, useCallback, useEffect } from 'react'
 import { Outlet, NavLink, useParams } from 'react-router-dom'
 import {
   LayoutDashboard, Hammer, HardHat,
   Building2, PaintBucket, ClipboardList, Sparkles, BarChart2, Settings2,
 } from 'lucide-react'
 import ChatPanel from '../components/ChatPanel'
+import { useChatStore } from '../store/chatStore'
 
 const TABS = [
   { slug: '',               label: 'Panel',           icon: LayoutDashboard, end: true },
@@ -23,11 +24,20 @@ const DEFAULT_WIDTH = 400
 
 export default function ProyectoPanelLayout() {
   const { id } = useParams()
-  const [chatOpen, setChatOpen] = useState(false)
-  const [chatWidth, setChatWidth] = useState(DEFAULT_WIDTH)
+  const chatOpen = useChatStore((s) => s.open)
+  const setChatOpen = useChatStore((s) => s.setOpen)
+  const chatWidth = useChatStore((s) => s.width)
+  const setChatWidth = useChatStore((s) => s.setWidth)
   const dragging = useRef(false)
   const startX = useRef(0)
   const startWidth = useRef(DEFAULT_WIDTH)
+
+  // Permite abrir el chat desde otros componentes (ej. empty state del Panel)
+  useEffect(() => {
+    const open = () => setChatOpen(true)
+    window.addEventListener('c4:open-chat', open)
+    return () => window.removeEventListener('c4:open-chat', open)
+  }, [])
 
   const onMouseDown = useCallback((e: React.MouseEvent) => {
     dragging.current = true
@@ -106,7 +116,7 @@ export default function ProyectoPanelLayout() {
           </div>
 
           <button
-            onClick={() => setChatOpen((v) => !v)}
+            onClick={() => setChatOpen(!chatOpen)}
             className="aurora-btn flex items-center gap-1.5 mr-3 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white shadow-md transition-all duration-200"
           >
             <Sparkles className="w-3.5 h-3.5" />
@@ -138,7 +148,7 @@ export default function ProyectoPanelLayout() {
             )}
 
             <div className="flex-1 overflow-hidden flex flex-col">
-              <ChatPanel proyectoId={id} onClose={() => setChatOpen(false)} />
+              <ChatPanel proyectoId={id} />
             </div>
           </div>
         )}

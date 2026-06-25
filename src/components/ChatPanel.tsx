@@ -1,35 +1,32 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { useLocation } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import {
   Send, Mic, Paperclip, Sparkles, Loader2,
   CheckCircle2, Download, FileText, X, Plus, Trash2, Map,
 } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
+import { useChatStore } from '../store/chatStore'
 import { API_BASE, API_HOST } from '../lib/config'
-
-interface ChatMensaje {
-  id: number
-  rol: 'user' | 'assistant' | 'pdf' | 'plano'
-  contenido: string
-  streaming?: boolean
-  adjunto?: { nombre: string; tipo: string; base64: string }
-}
 
 interface Props {
   proyectoId: string
-  onClose: () => void
 }
 
-export default function ChatPanel({ proyectoId, onClose }: Props) {
+export default function ChatPanel({ proyectoId }: Props) {
   const token = useAuthStore((s) => s.token)
   const headers = { Authorization: `Bearer ${token}` }
+  const { pathname } = useLocation()
 
-  const [mensajes, setMensajes] = useState<ChatMensaje[]>([
-    { id: 0, rol: 'assistant', contenido: 'Hola, soy el **Asistente C4** — motor de pre-inversión para Lima.\n\nVoy a hacerte una serie de preguntas para construir el análisis más preciso posible. Cuantos más datos me des, más exactos serán la cabida, el modelo financiero y el plano DXF.\n\n¿Cuéntame sobre el terreno que tienes? Empieza por la **ubicación o distrito** y si hay algo construido actualmente.' },
-  ])
+  // Estado del chat y streaming viven en el store global → persisten al navegar
+  const mensajes = useChatStore((s) => s.mensajes)
+  const sending = useChatStore((s) => s.sending)
+  const steps = useChatStore((s) => s.steps)
+  const cargarSesion = useChatStore((s) => s.cargarSesion)
+  const enviar = useChatStore((s) => s.enviar)
+  const setOpen = useChatStore((s) => s.setOpen)
+
   const [input, setInput] = useState('')
-  const [sending, setSending] = useState(false)
-  const [steps, setSteps] = useState<{ text: string; icon: string; done: boolean }[]>([])
   const [archivo, setArchivo] = useState<{ nombre: string; tipo: string; base64: string } | null>(null)
   const [docs, setDocs] = useState<{ id: string; nombre: string; tipo: string }[]>([])
   const [subiendoDoc, setSubiendoDoc] = useState(false)
@@ -38,17 +35,8 @@ export default function ChatPanel({ proyectoId, onClose }: Props) {
   const docInputRef = useRef<HTMLInputElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  // Cargar historial de mensajes
-  useEffect(() => {
-    fetch(`${API_BASE}/chat/${proyectoId}/sesion`, { headers })
-      .then((r) => r.json())
-      .then(({ mensajes: hist }) => {
-        if (hist?.length) {
-          setMensajes(hist.map((m: any, i: number) => ({ id: i, rol: m.rol, contenido: m.contenido })))
-        }
-      })
-      .catch(() => {})
-  }, [proyectoId])
+  // Carga la sesión del proyecto (el store no reinicia si ya es el mismo)
+  useEffect(() => { cargarSesion(proyectoId) }, [proyectoId, cargarSesion])
 
   // Cargar documentos del proyecto
   useEffect(() => {
@@ -99,97 +87,17 @@ export default function ChatPanel({ proyectoId, onClose }: Props) {
     setDocs((prev) => prev.filter((d) => d.id !== docId))
   }
 
-  async function handleSend() {
+  function handleSend() {
     if (!input.trim() || sending) return
     const userMsg = input.trim()
     setInput('')
-    setSending(true)
+    const adjunto = archivo ?? undefined
     setArchivo(null)
-    setSteps([{ text: 'Analizando tu mensaje...', icon: 'think', done: false }])
-
-    const userId = Date.now()
-    const assistantId = userId + 1
-    const adjuntoSnapshot = archivo ?? undefined
-
-    setMensajes((prev) => [
-      ...prev,
-      { id: userId, rol: 'user', contenido: userMsg, adjunto: adjuntoSnapshot },
-      { id: assistantId, rol: 'assistant', contenido: '', streaming: true },
-    ])
-
-    try {
-      const res = await fetch(`${API_BASE}/chat/stream`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          proyectoId,
-          mensaje: userMsg,
-          ...(archivo && { archivoBase64: archivo.base64, archivoNombre: archivo.nombre, archivoTipo: archivo.tipo }),
-        }),
-      })
-
-      if (!res.ok || !res.body) throw new Error('stream failed')
-
-      const reader = res.body.getReader()
-      const decoder = new TextDecoder()
-      let buffer = ''
-      let accumulated = ''
-
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        buffer += decoder.decode(value, { stream: true })
-
-        const parts = buffer.split('\n\n')
-        buffer = parts.pop() ?? ''
-
-        for (const part of parts) {
-          if (!part.trim()) continue
-          const lines = part.split('\n')
-          const eventLine = lines.find((l) => l.startsWith('event:'))
-          const dataLine = lines.find((l) => l.startsWith('data:'))
-          if (!dataLine) continue
-
-          const eventType = eventLine?.slice(6).trim() ?? 'token'
-          let data: any
-          try { data = JSON.parse(dataLine.slice(5)) } catch { continue }
-
-          if (eventType === 'token') {
-            accumulated += data.text
-            setMensajes((prev) => prev.map((m) => m.id === assistantId ? { ...m, contenido: accumulated } : m))
-          } else if (eventType === 'status') {
-            setSteps((prev) => [
-              ...prev.map((s) => ({ ...s, done: true })),
-              { text: data.step ?? '', icon: data.icon ?? 'think', done: false },
-            ])
-          } else if (eventType === 'pdf_ready') {
-            setMensajes((prev) => [...prev, { id: Date.now(), rol: 'pdf', contenido: data.url }])
-          } else if (eventType === 'plano_ready') {
-            setMensajes((prev) => {
-              const idx = prev.findIndex((m) => m.id === assistantId)
-              const planoMsg = { id: Date.now(), rol: 'plano' as const, contenido: data.url }
-              if (idx === -1) return [...prev, planoMsg]
-              return [...prev.slice(0, idx), planoMsg, ...prev.slice(idx)]
-            })
-          } else if (eventType === 'done') {
-            setSteps((prev) => prev.map((s) => ({ ...s, done: true })))
-            setTimeout(() => setSteps([]), 1800)
-            setMensajes((prev) => prev.map((m) => m.id === assistantId ? { ...m, streaming: false } : m))
-          } else if (eventType === 'error') {
-            setSteps([])
-            setMensajes((prev) => prev.map((m) =>
-              m.id === assistantId ? { ...m, contenido: '⚠️ Error al procesar. Intenta de nuevo.', streaming: false } : m
-            ))
-          }
-        }
-      }
-    } catch {
-      setMensajes((prev) => prev.map((m) =>
-        m.id === assistantId ? { ...m, contenido: '⚠️ No se pudo conectar con el asistente.', streaming: false } : m
-      ))
-    } finally {
-      setSending(false)
-    }
+    // Fase que el usuario está viendo (contexto para la IA)
+    const m = pathname.match(/\/panel\/(demolicion|excavacion|construccion|acabados|administracion)/)
+    const faseActual = m?.[1]
+    // El streaming corre en el store: continúa aunque navegues o desmontes el panel
+    enviar(userMsg, adjunto, faseActual)
   }
 
   return (
@@ -219,7 +127,7 @@ export default function ChatPanel({ proyectoId, onClose }: Props) {
           </div>
         </div>
         <button
-          onClick={onClose}
+          onClick={() => setOpen(false)}
           className="w-7 h-7 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors"
         >
           <X className="w-4 h-4" />
@@ -376,7 +284,7 @@ export default function ChatPanel({ proyectoId, onClose }: Props) {
         <input
           ref={docInputRef}
           type="file"
-          accept=".pdf,image/*"
+          accept=".pdf,.dxf,image/*"
           className="hidden"
           onChange={(e) => { const f = e.target.files?.[0]; if (f) subirDocumento(f); e.target.value = '' }}
         />
@@ -410,7 +318,7 @@ export default function ChatPanel({ proyectoId, onClose }: Props) {
             </div>
           </div>
         )}
-        <input ref={fileInputRef} type="file" accept=".pdf,image/*" className="hidden" onChange={handleFileChange} />
+        <input ref={fileInputRef} type="file" accept=".pdf,.dxf,image/*" className="hidden" onChange={handleFileChange} />
         <div className="flex items-end gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 focus-within:border-blue-300 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
           <button
             onClick={() => fileInputRef.current?.click()}
@@ -423,7 +331,7 @@ export default function ChatPanel({ proyectoId, onClose }: Props) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
-            placeholder="Ej: 300m² en Miraflores, frente 12m..."
+            placeholder="Escribe tu mensaje, sube un documento o pregunta algo técnico..."
             className="flex-1 bg-transparent text-sm text-slate-700 placeholder:text-slate-400 outline-none resize-none"
           />
           <div className="flex items-center gap-1.5 shrink-0">
