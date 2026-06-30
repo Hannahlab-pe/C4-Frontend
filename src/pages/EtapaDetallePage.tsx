@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft, ChevronLeft, ChevronRight, Loader2, Plus, Trash2,
-  ImagePlus, X, ListChecks, StickyNote, Users, CheckCircle2, Sparkles, ScanEye,
+  ImagePlus, X, ListChecks, StickyNote, Users, CheckCircle2, Sparkles, ScanEye, Lock,
 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import { useAuthStore } from '../store/authStore'
@@ -14,9 +14,15 @@ import {
 import type { RegistroFase, EtapaFase } from '../lib/registros-fase'
 
 interface Foto { id: string; nombre: string; dataUrl: string; fecha: string }
-interface EtapaDatos { fotos?: Foto[]; notas?: string; asignados?: string; analisisIA?: { texto: string; fecha: string } }
+interface EtapaDatos { fotos?: Foto[]; notas?: string; asignados?: string; responsables?: string[]; analisisIA?: { texto: string; fecha: string } }
+interface Miembro { id: string; usuarioId: string; nombre: string; email: string; rolObra: string; fase: string | null }
 
 const uid = () => Math.random().toString(36).slice(2, 10)
+
+const FASE_LABEL: Record<string, string> = {
+  demolicion: 'Demolición', excavacion: 'Excavación', construccion: 'Construcción',
+  acabados: 'Acabados', administracion: 'Administración',
+}
 
 export default function EtapaDetallePage() {
   const { id: proyectoId, fase, etapa: etapaKey } = useParams<{ id: string; fase: string; etapa: string }>()
@@ -43,6 +49,10 @@ export default function EtapaDetallePage() {
   const [lightbox, setLightbox] = useState<Foto | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
+  // Equipo del proyecto + permiso para asignar responsables
+  const [equipo, setEquipo] = useState<Miembro[]>([])
+  const [puedeAsignar, setPuedeAsignar] = useState(false)
+
   const notasTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastSaved = useRef<string>('{}')
 
@@ -64,6 +74,18 @@ export default function EtapaDetallePage() {
       setEtapasList(Array.isArray(etps?.datos?.etapas) ? etps.datos.etapas : [])
     }).finally(() => setLoading(false))
   }, [proyectoId, fase, etapaKey])
+
+  // Equipo del proyecto (para el selector de responsables) + mi rol
+  useEffect(() => {
+    if (!proyectoId) return
+    Promise.all([
+      fetch(`${API_BASE}/proyectos/${proyectoId}/equipo`, { headers }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
+      fetch(`${API_BASE}/proyectos/${proyectoId}/mi-rol`, { headers }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    ]).then(([eq, rol]) => {
+      setEquipo(Array.isArray(eq) ? eq : [])
+      setPuedeAsignar(rol?.rolObra === 'jefe_proyecto' || rol?.rolObra === 'jefe_fase')
+    })
+  }, [proyectoId])
 
   // Refresco en vivo cuando la IA crea etapas o genera el proyecto
   useEffect(() => {
@@ -101,6 +123,17 @@ export default function EtapaDetallePage() {
     return agruparPorEtapa(etapasList, registros)[etapaKey] ?? []
   }, [etapasList, etapaKey, registros, fase])
 
+  // Responsables = ids de usuario del equipo. Toggle (solo jefe).
+  const responsables = datos.responsables ?? []
+  const toggleResponsable = (usuarioId: string) => {
+    if (!puedeAsignar) return
+    const next = responsables.includes(usuarioId)
+      ? responsables.filter((x) => x !== usuarioId)
+      : [...responsables, usuarioId]
+    persistir({ ...datos, responsables: next })
+  }
+  const seleccionados = equipo.filter((m) => responsables.includes(m.usuarioId))
+
   if (loading) return (
     <div className="h-full flex items-center justify-center gap-3 text-slate-400">
       <Loader2 className="w-5 h-5 animate-spin" /><span className="text-sm">Cargando etapa...</span>
@@ -137,11 +170,10 @@ export default function EtapaDetallePage() {
     setRegistros((p) => p.map((x) => x.id === reg.id ? { ...x, estado } : x))
     await fetch(`${API_BASE}/registros-fase/${reg.id}`, { method: 'PATCH', headers, body: JSON.stringify({ estado }) })
   }
-  function setRespLocal(reg: RegistroFase, value: string) {
-    setRegistros((p) => p.map((x) => x.id === reg.id ? { ...x, datos: { ...x.datos, responsable: value } } : x))
-  }
-  async function persistResp(reg: RegistroFase) {
-    await fetch(`${API_BASE}/registros-fase/${reg.id}`, { method: 'PATCH', headers, body: JSON.stringify({ datos: reg.datos }) })
+  async function asignarResponsable(reg: RegistroFase, value: string) {
+    const datosNuevos = { ...reg.datos, responsable: value }
+    setRegistros((p) => p.map((x) => x.id === reg.id ? { ...x, datos: datosNuevos } : x))
+    await fetch(`${API_BASE}/registros-fase/${reg.id}`, { method: 'PATCH', headers, body: JSON.stringify({ datos: datosNuevos }) })
   }
   async function eliminarActividad(rid: string) {
     setRegistros((p) => p.filter((x) => x.id !== rid))
@@ -366,16 +398,21 @@ export default function EtapaDetallePage() {
                     <div key={reg.id} className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50/60 transition-colors group">
                       <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${estadoRegistroClase(reg.estado)}`}>{reg.estado}</span>
                       <span className="text-sm text-slate-700 flex-1 min-w-0 truncate" title={reg.nombre}>{reg.nombre}</span>
-                      {/* Responsable editable de la actividad */}
+                      {/* Responsable de la actividad — selector del equipo (solo jefe asigna) */}
                       <div className="flex items-center gap-1 shrink-0 w-44">
                         <Users className="w-3.5 h-3.5 text-slate-300 shrink-0" />
-                        <input
-                          value={reg.datos?.responsable ?? ''}
-                          onChange={(e) => setRespLocal(reg, e.target.value)}
-                          onBlur={() => persistResp(reg)}
-                          placeholder="Responsable / cuadrilla"
-                          className="w-full text-[11px] text-slate-600 border border-transparent hover:border-slate-200 focus:border-blue-400 rounded-md px-1.5 py-1 outline-none transition-colors bg-transparent focus:bg-white"
-                        />
+                        {puedeAsignar && equipo.length > 0 ? (
+                          <select
+                            value={reg.datos?.responsable ?? ''}
+                            onChange={(e) => asignarResponsable(reg, e.target.value)}
+                            className="w-full text-[11px] text-slate-600 border border-transparent hover:border-slate-200 focus:border-blue-400 rounded-md px-1.5 py-1 outline-none transition-colors bg-transparent focus:bg-white cursor-pointer"
+                          >
+                            <option value="">Sin asignar</option>
+                            {equipo.map((m) => <option key={m.id} value={m.nombre}>{m.nombre}</option>)}
+                          </select>
+                        ) : (
+                          <span className="w-full text-[11px] text-slate-500 truncate px-1.5">{reg.datos?.responsable || '—'}</span>
+                        )}
                       </div>
                       <select
                         value={reg.estado}
@@ -402,13 +439,50 @@ export default function EtapaDetallePage() {
               <Users className="w-4 h-4 text-slate-400" />
               <h2 className="text-xs font-bold text-slate-600 uppercase tracking-widest">Responsables</h2>
             </div>
-            <textarea
-              value={datos.asignados ?? ''}
-              onChange={(e) => persistir({ ...datos, asignados: e.target.value })}
-              placeholder="Ej: Ing. residente, empresa demoledora, supervisor SSOMA..."
-              rows={3}
-              className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 resize-none"
-            />
+            {/* Responsables: chips seleccionados (con ✕) + dropdown para agregar */}
+            {seleccionados.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5 mb-2.5">
+                {seleccionados.map((m) => (
+                  <span key={m.id} className="flex items-center gap-1.5 text-xs pl-1 pr-2 py-1 rounded-full bg-slate-900 text-white">
+                    <span className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-[10px] font-bold">{m.nombre.charAt(0).toUpperCase()}</span>
+                    {m.nombre}
+                    {puedeAsignar && (
+                      <button onClick={() => toggleResponsable(m.usuarioId)} className="ml-0.5 text-white/60 hover:text-white" title="Quitar">
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              !puedeAsignar && <p className="flex items-center gap-1.5 text-xs text-slate-400 mb-1"><Lock className="w-3.5 h-3.5" /> Sin responsables asignados.</p>
+            )}
+
+            {puedeAsignar && (
+              equipo.length === 0 ? (
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Aún no hay miembros en el equipo. Agrégalos en la pestaña <span className="font-semibold text-slate-600">Equipo</span>.
+                </p>
+              ) : (() => {
+                const disponibles = equipo.filter((m) => !responsables.includes(m.usuarioId))
+                return disponibles.length > 0 ? (
+                  <select
+                    value=""
+                    onChange={(e) => { if (e.target.value) toggleResponsable(e.target.value) }}
+                    className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 bg-white text-slate-600 cursor-pointer"
+                  >
+                    <option value="">+ Agregar responsable…</option>
+                    {disponibles.map((m) => (
+                      <option key={m.id} value={m.usuarioId}>
+                        {m.nombre}{m.fase ? ` · ${FASE_LABEL[m.fase] ?? m.fase}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="text-[11px] text-slate-400">Todos los miembros del equipo ya están asignados.</p>
+                )
+              })()
+            )}
           </section>
 
           <section className="bg-white rounded-2xl border border-slate-200 p-5">
