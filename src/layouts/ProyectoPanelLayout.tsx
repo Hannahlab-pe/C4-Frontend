@@ -64,6 +64,16 @@ export default function ProyectoPanelLayout() {
     return () => window.removeEventListener('c4:open-chat', open)
   }, [])
 
+  // Refresco en vivo: cambios hechos por WhatsApp / la IA aparecen sin recargar.
+  // Dispara el refetch de etapas y actividades cada 7s (los módulos ya escuchan estos eventos).
+  useEffect(() => {
+    const t = setInterval(() => {
+      window.dispatchEvent(new Event('c4:etapas-updated'))
+      window.dispatchEvent(new Event('c4:proyecto-updated'))
+    }, 7000)
+    return () => clearInterval(t)
+  }, [])
+
   const onMouseDown = useCallback((e: React.MouseEvent) => {
     dragging.current = true
     startX.current = e.clientX
