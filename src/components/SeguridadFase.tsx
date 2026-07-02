@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 import { API_BASE } from '../lib/config'
+import { setGuardado } from '../store/guardadoStore'
 
 interface ItemCheck { id: string; item: string; estado: 'pendiente' | 'cumple' | 'no_aplica'; critico?: boolean }
 interface Incidente { id: string; fecha: string; descripcion: string; severidad: 'baja' | 'media' | 'alta'; estado: 'abierto' | 'cerrado' }
@@ -83,10 +84,11 @@ export default function SeguridadFase({ proyectoId, fase }: { proyectoId: string
     const json = JSON.stringify(next)
     if (json === lastSaved.current) return
     if (timer.current) clearTimeout(timer.current)
+    setGuardado('saving')
     timer.current = setTimeout(() => {
       fetch(`${API_BASE}/fases-detalle/${proyectoId}/${detalleKey}`, {
         method: 'PUT', headers, body: JSON.stringify({ datos: next }),
-      }).then(() => { lastSaved.current = json }).catch(() => {})
+      }).then((r) => { if (!r.ok) throw new Error(); lastSaved.current = json; setGuardado('saved') }).catch(() => setGuardado('error'))
     }, 600)
   }
 

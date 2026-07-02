@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 import { API_BASE } from '../lib/config'
+import { setGuardado } from '../store/guardadoStore'
 import { estadoEtapaInfo } from '../lib/registros-fase'
 import AppDialog from './AppDialog'
 
@@ -54,10 +55,11 @@ export default function CalzadurasFase({ proyectoId }: { proyectoId: string }) {
     const json = JSON.stringify(next)
     if (json === lastSaved.current) return
     if (timer.current) clearTimeout(timer.current)
+    setGuardado('saving')
     timer.current = setTimeout(() => {
       fetch(`${API_BASE}/fases-detalle/${proyectoId}/${detalleKey}`, {
         method: 'PUT', headers, body: JSON.stringify({ datos: { calzaduras: next } }),
-      }).then(() => { lastSaved.current = json }).catch(() => {})
+      }).then((r) => { if (!r.ok) throw new Error(); lastSaved.current = json; setGuardado('saved') }).catch(() => setGuardado('error'))
     }, 500)
   }
   const upd = (id: string, patch: Partial<Calzadura>) => persistir(lista.map((c) => c.id === id ? { ...c, ...patch } : c))
@@ -77,6 +79,10 @@ export default function CalzadurasFase({ proyectoId }: { proyectoId: string }) {
   function setPanos(c: Calzadura, delta: number) {
     const v = Math.max(0, Math.min(c.numPanos || 0, c.panosCompletos + delta))
     upd(c.id, { panosCompletos: v })
+  }
+  function setAnillos(c: Calzadura, delta: number) {
+    const v = Math.max(0, Math.min(c.numAnillos || 0, (c.anillosCompletos || 0) + delta))
+    upd(c.id, { anillosCompletos: v })
   }
 
   if (loading) return (
@@ -172,11 +178,20 @@ export default function CalzadurasFase({ proyectoId }: { proyectoId: string }) {
                     <span className="text-sm font-bold text-slate-700 tabular-nums w-10 text-right">{pct}%</span>
                   </div>
 
+                  {/* Avance por anillos descendentes */}
+                  {(c.numAnillos || 0) > 0 && (
+                    <div className="flex items-center gap-1.5 mb-3">
+                      <button onClick={() => setAnillos(c, -1)} disabled={(c.anillosCompletos || 0) <= 0} className="w-6 h-6 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 disabled:opacity-30"><Minus className="w-3 h-3" /></button>
+                      <span className="text-sm font-bold text-slate-800 tabular-nums w-16 text-center">{c.anillosCompletos || 0}/{c.numAnillos}</span>
+                      <button onClick={() => setAnillos(c, 1)} disabled={(c.anillosCompletos || 0) >= (c.numAnillos || 0)} className="w-6 h-6 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 disabled:opacity-30"><Plus className="w-3 h-3" /></button>
+                      <span className="text-[11px] text-slate-400 ml-1">anillos descendentes ejecutados</span>
+                    </div>
+                  )}
+
                   {/* Mini-stats */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <div className="grid grid-cols-3 gap-2">
                     {[
                       { label: 'Profundidad', value: c.profundidadM ? `${c.profundidadM} m` : '—' },
-                      { label: 'Anillos', value: `${c.anillosCompletos || 0}/${c.numAnillos || 0}` },
                       { label: 'Dimensiones', value: c.dimensiones || '—' },
                       { label: 'Concreto', value: c.concreto || '—' },
                     ].map((s) => (

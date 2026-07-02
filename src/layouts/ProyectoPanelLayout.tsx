@@ -5,6 +5,7 @@ import {
   Building2, PaintBucket, ClipboardList, Sparkles, BarChart2, Settings2, Users, Lock, Loader2,
 } from 'lucide-react'
 import ChatPanel from '../components/ChatPanel'
+import GuardadoIndicator from '../components/GuardadoIndicator'
 import { useChatStore } from '../store/chatStore'
 import { useAuthStore } from '../store/authStore'
 import { API_BASE } from '../lib/config'
@@ -206,6 +207,8 @@ export default function ProyectoPanelLayout() {
           </div>
         )}
       </div>
+
+      <GuardadoIndicator />
     </div>
   )
 }

@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 import { API_BASE } from '../lib/config'
+import { setGuardado } from '../store/guardadoStore'
 import AppDialog from './AppDialog'
 
 interface Lectura { id: string; fecha: string; valorMm: number }
@@ -47,10 +48,11 @@ export default function MonitoreoFase({ proyectoId }: { proyectoId: string }) {
     const json = JSON.stringify(next)
     if (json === lastSaved.current) return
     if (timer.current) clearTimeout(timer.current)
+    setGuardado('saving')
     timer.current = setTimeout(() => {
       fetch(`${API_BASE}/fases-detalle/${proyectoId}/${detalleKey}`, {
         method: 'PUT', headers, body: JSON.stringify({ datos: next }),
-      }).then(() => { lastSaved.current = json }).catch(() => {})
+      }).then((r) => { if (!r.ok) throw new Error(); lastSaved.current = json; setGuardado('saved') }).catch(() => setGuardado('error'))
     }, 500)
   }
 

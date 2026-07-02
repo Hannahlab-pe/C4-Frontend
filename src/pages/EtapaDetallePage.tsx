@@ -7,6 +7,7 @@ import {
 import ReactMarkdown from 'react-markdown'
 import { useAuthStore } from '../store/authStore'
 import { API_BASE } from '../lib/config'
+import { setGuardado } from '../store/guardadoStore'
 import {
   ESQUEMAS_REGISTRO, FASES_CONFIG_MIN,
   agruparPorEtapa, avanceEtapa, estadoEtapaInfo, estadoRegistroClase,
@@ -111,10 +112,11 @@ export default function EtapaDetallePage() {
     const json = JSON.stringify(next)
     if (json === lastSaved.current) return
     if (notasTimer.current) clearTimeout(notasTimer.current)
+    setGuardado('saving')
     notasTimer.current = setTimeout(() => {
       fetch(`${API_BASE}/fases-detalle/${proyectoId}/${detalleKey}`, {
         method: 'PUT', headers, body: JSON.stringify({ datos: next }),
-      }).then(() => { lastSaved.current = json }).catch(() => {})
+      }).then((r) => { if (!r.ok) throw new Error(); lastSaved.current = json; setGuardado('saved') }).catch(() => setGuardado('error'))
     }, 600)
   }
 

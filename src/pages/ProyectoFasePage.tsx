@@ -8,6 +8,7 @@ import {
   Upload, ShieldAlert, ShieldCheck, FileCheck2, ChevronRight, ChevronUp, ChevronDown, Pencil, ImageIcon, Users, Layers, Mountain, Activity, TestTube2, Gauge, type LucideIcon,
 } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
+import { setGuardado } from '../store/guardadoStore'
 import { API_BASE } from '../lib/config'
 import AppDialog from '../components/AppDialog'
 import SeguridadFase from '../components/SeguridadFase'
@@ -474,9 +475,10 @@ export default function ProyectoFasePage() {
   // ── Gestión de etapas (persistidas en fases-detalle `${fase}__etapas`) ──────
   async function persistEtapas(next: EtapaFase[]) {
     setEtapas(next)
+    setGuardado('saving')
     await fetch(`${API_BASE}/fases-detalle/${proyectoId}/${fase}__etapas`, {
       method: 'PUT', headers, body: JSON.stringify({ datos: { etapas: next } }),
-    }).catch(() => {})
+    }).then((r) => { if (!r.ok) throw new Error(); setGuardado('saved') }).catch(() => setGuardado('error'))
   }
   function guardarEtapa() {
     if (!modalEtapa?.nombre?.trim()) return
@@ -671,7 +673,7 @@ export default function ProyectoFasePage() {
 
   const TABS = [
     { key: 'etapas',      label: 'Etapas de obra', icon: GitBranch },
-    { key: 'seguridad',   label: 'Seguridad',      icon: ShieldCheck },
+    ...(fase !== 'administracion' ? [{ key: 'seguridad', label: 'Seguridad', icon: ShieldCheck }] : []),
     ...(fase === 'excavacion' ? [{ key: 'suelos', label: 'Estudio de Suelos', icon: Mountain }, { key: 'calzaduras', label: 'Calzaduras', icon: Layers }, { key: 'tierras', label: 'Mov. de tierras', icon: Truck }, { key: 'monitoreo', label: 'Monitoreo', icon: Activity }] : []),
     ...(fase === 'construccion' ? [{ key: 'concreto', label: 'Control de concreto', icon: TestTube2 }, { key: 'ciclo', label: 'Ciclo de piso', icon: Building2 }] : []),
     ...(['demolicion', 'excavacion', 'construccion', 'acabados'].includes(fase ?? '') ? [{ key: 'productividad', label: 'Productividad', icon: Gauge }] : []),
@@ -1035,7 +1037,7 @@ export default function ProyectoFasePage() {
                       </button>
                     </div>
                     {registros.length === 0 ? (
-                      <EmptyTab icon={PaintBucket} titulo="Sin unidades" sub="El Asistente C4 genera una unidad por departamento al generar el proyecto." />
+                      <EmptyTab icon={PaintBucket} titulo="Sin unidades" sub="Agrega cada departamento con «Nueva Unidad», o deja que el Asistente C4 los genere al armar el proyecto." />
                     ) : (
                       <div className="divide-y divide-slate-50 py-1">
                         {registros.map((reg) => <FilaRegistro key={reg.id} reg={reg} />)}

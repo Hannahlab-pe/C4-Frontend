@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Truck, Plus, Trash2, Loader2, Mountain, Layers3, Recycle } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 import { API_BASE } from '../lib/config'
+import { setGuardado } from '../store/guardadoStore'
 import { estadoEtapaInfo } from '../lib/registros-fase'
 
 interface Sotano { id: string; nombre: string; volumenProyectado: number; volumenExcavado: number }
@@ -40,10 +41,11 @@ export default function MovimientoTierrasFase({ proyectoId }: { proyectoId: stri
     const json = JSON.stringify(next)
     if (json === lastSaved.current) return
     if (timer.current) clearTimeout(timer.current)
+    setGuardado('saving')
     timer.current = setTimeout(() => {
       fetch(`${API_BASE}/fases-detalle/${proyectoId}/${detalleKey}`, {
         method: 'PUT', headers, body: JSON.stringify({ datos: next }),
-      }).then(() => { lastSaved.current = json }).catch(() => {})
+      }).then((r) => { if (!r.ok) throw new Error(); lastSaved.current = json; setGuardado('saved') }).catch(() => setGuardado('error'))
     }, 500)
   }
   const setCampo = (k: keyof MovDatos, v: any) => persistir({ ...datos, [k]: v })
