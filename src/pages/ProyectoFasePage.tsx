@@ -415,12 +415,12 @@ export default function ProyectoFasePage() {
     const refetchTodo = (e?: Event) => {
       const det = (e as CustomEvent)?.detail
       if (det?.fase && det.fase !== fase) return
-      fetch(`${API_BASE}/fases-detalle/${proyectoId}/${fase}__etapas`, { headers: h })
+      fetch(`${API_BASE}/fases-detalle/${proyectoId}/${fase}__etapas`, { headers: h, cache: 'no-store' })
         .then((r) => (r.ok ? r.json() : null))
         .then((d) => setEtapas(Array.isArray(d?.datos?.etapas) ? d.datos.etapas : [])).catch(() => {})
-      fetch(`${API_BASE}/registros-fase/${proyectoId}/${fase}`, { headers: h })
+      fetch(`${API_BASE}/registros-fase/${proyectoId}/${fase}`, { headers: h, cache: 'no-store' })
         .then((r) => (r.ok ? r.json() : [])).then((d) => setRegistros(Array.isArray(d) ? d : [])).catch(() => {})
-      fetch(`${API_BASE}/documentos-requeridos/${proyectoId}/${fase}`, { headers: h })
+      fetch(`${API_BASE}/documentos-requeridos/${proyectoId}/${fase}`, { headers: h, cache: 'no-store' })
         .then((r) => (r.ok ? r.json() : [])).then((d) => setDocsReq(Array.isArray(d) ? d : [])).catch(() => {})
     }
     window.addEventListener('c4:etapas-updated', refetchTodo)
