@@ -788,7 +788,7 @@ export default function ProyectoFasePage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto">
+    <div className="h-full overflow-y-auto overflow-x-hidden">
 
       {/* Input oculto para subir documentos requeridos */}
       <input ref={fileInputRef} type="file" className="hidden"
@@ -828,12 +828,12 @@ export default function ProyectoFasePage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-0">
+        <div className="flex gap-0 overflow-x-auto">
           {TABS.map(({ key, label, icon: TabIcon, badge }) => (
             <button
               key={key}
               onClick={() => setTab(key)}
-              className={`flex items-center gap-1.5 px-4 py-3 text-xs font-medium border-b-2 transition-colors ${
+              className={`flex items-center gap-1.5 px-4 py-3 text-xs font-medium border-b-2 whitespace-nowrap shrink-0 transition-colors ${
                 tab === key ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-400 hover:text-slate-600'
               }`}
             >
