@@ -132,7 +132,7 @@ export default function SeguridadFase({ proyectoId, fase }: { proyectoId: string
   const vacio = checklist.length === 0 && incidentes.length === 0 && riesgos.length === 0
 
   return (
-    <div className="max-w-4xl space-y-5">
+    <div className="space-y-5">
 
       {/* Resumen */}
       <div className="grid grid-cols-3 gap-3">

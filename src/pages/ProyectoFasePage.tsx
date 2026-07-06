@@ -851,7 +851,7 @@ export default function ProyectoFasePage() {
 
         {/* ════ TAB: ETAPAS DE OBRA (pipeline) ════ */}
         {tab === 'etapas' && (
-          <div className="space-y-4 max-w-4xl">
+          <div className="space-y-4">
             {loadingRegs ? (
               <div className="flex items-center justify-center py-16 text-slate-400">
                 <Loader2 className="w-4 h-4 animate-spin mr-2" /><span className="text-sm">Cargando...</span>

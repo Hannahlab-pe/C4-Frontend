@@ -154,7 +154,7 @@ export default function ColindantesFase({ proyectoId }: { proyectoId: string }) 
   const reclamosAbiertos = lista.reduce((s, c) => s + c.reclamos.filter((r) => r.estado === 'abierto').length, 0)
 
   return (
-    <div className="max-w-4xl space-y-5">
+    <div className="space-y-5">
       <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={onArchivos} />
 
       {/* Resumen */}

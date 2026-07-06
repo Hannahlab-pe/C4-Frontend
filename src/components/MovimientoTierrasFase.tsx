@@ -73,7 +73,7 @@ export default function MovimientoTierrasFase({ proyectoId }: { proyectoId: stri
   const est = estadoEtapaInfo(pct)
 
   return (
-    <div className="max-w-4xl space-y-5">
+    <div className="space-y-5">
       {/* Highlights */}
       <div className="grid grid-cols-3 gap-3">
         <div className="bg-white rounded-2xl border border-slate-200 px-5 py-4">

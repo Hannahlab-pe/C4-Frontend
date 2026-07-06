@@ -120,7 +120,7 @@ export default function ControlConcretoFase({ proyectoId }: { proyectoId: string
   })
 
   return (
-    <div className="max-w-4xl space-y-5">
+    <div className="space-y-5">
       {/* Resumen */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[

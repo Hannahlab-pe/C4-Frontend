@@ -89,7 +89,7 @@ export default function CicloPisoFase({ proyectoId }: { proyectoId: string }) {
         : 'bg-white text-slate-300 border-slate-200 hover:border-slate-300'
 
   return (
-    <div className="max-w-4xl space-y-5">
+    <div className="space-y-5">
       {/* Resumen */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[

@@ -84,7 +84,7 @@ export default function SuelosFase({ proyectoId }: { proyectoId: string }) {
   ]
 
   return (
-    <div className="max-w-4xl space-y-5">
+    <div className="space-y-5">
       <input ref={fileRef} type="file" accept="application/pdf" className="hidden" onChange={analizarEms} />
 
       {/* Header + IA */}
