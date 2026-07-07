@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
-  ArrowLeft, ChevronLeft, ChevronRight, Loader2, Plus, Trash2,
+  ArrowLeft, ChevronLeft, ChevronRight, ChevronDown, Loader2, Plus, Trash2,
   ImagePlus, X, ListChecks, StickyNote, Users, CheckCircle2, Sparkles, ScanEye, Lock,
+  Wand2, Search, Ruler, Check,
 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import { useAuthStore } from '../store/authStore'
@@ -17,6 +18,9 @@ import type { RegistroFase, EtapaFase } from '../lib/registros-fase'
 interface Foto { id: string; nombre: string; dataUrl: string; fecha: string }
 interface EtapaDatos { fotos?: Foto[]; notas?: string; asignados?: string; responsables?: string[]; analisisIA?: { texto: string; fecha: string } }
 interface Miembro { id: string; usuarioId: string; nombre: string; email: string; rolObra: string; fase: string | null }
+interface PartidaCat { codigo: string; partida: string; unidad: string; fase: string; especialidad: string; alcance?: string; control?: string }
+
+const nf = new Intl.NumberFormat('es-PE', { maximumFractionDigits: 2 })
 
 const uid = () => Math.random().toString(36).slice(2, 10)
 
@@ -49,6 +53,15 @@ export default function EtapaDetallePage() {
   const [analizando, setAnalizando] = useState(false)
   const [lightbox, setLightbox] = useState<Foto | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+
+  // Metrado (actividad expandida) + biblioteca de partidas con IA
+  const [expandido, setExpandido] = useState<string | null>(null)
+  const [modalPartidas, setModalPartidas] = useState(false)
+  const [busqueda, setBusqueda] = useState('')
+  const [resultados, setResultados] = useState<PartidaCat[]>([])
+  const [buscando, setBuscando] = useState(false)
+  const [seleccion, setSeleccion] = useState<Set<string>>(new Set())
+  const [agregandoPartidas, setAgregandoPartidas] = useState(false)
 
   // Equipo del proyecto + permiso para asignar responsables
   const [equipo, setEquipo] = useState<Miembro[]>([])
@@ -180,6 +193,59 @@ export default function EtapaDetallePage() {
   async function eliminarActividad(rid: string) {
     setRegistros((p) => p.filter((x) => x.id !== rid))
     await fetch(`${API_BASE}/registros-fase/${rid}`, { method: 'DELETE', headers })
+  }
+
+  // ── Metrado (dentro de cada actividad) ──
+  function actualizarLocal(reg: RegistroFase, patch: Record<string, any>) {
+    setRegistros((p) => p.map((x) => x.id === reg.id ? { ...x, datos: { ...x.datos, ...patch } } : x))
+  }
+  async function guardarDatos(reg: RegistroFase) {
+    setGuardado('saving')
+    try {
+      const r = await fetch(`${API_BASE}/registros-fase/${reg.id}`, {
+        method: 'PATCH', headers, body: JSON.stringify({ datos: reg.datos }),
+      })
+      if (!r.ok) throw new Error()
+      setGuardado('saved')
+    } catch { setGuardado('error') }
+  }
+
+  // ── Biblioteca de partidas (catálogo maestro) ──
+  async function buscarCatalogo() {
+    if (!busqueda.trim()) return
+    setBuscando(true)
+    try {
+      const r = await fetch(`${API_BASE}/partidas-catalogo/buscar?q=${encodeURIComponent(busqueda.trim())}`, { headers })
+      const d = await r.json()
+      const arr: PartidaCat[] = Array.isArray(d) ? d : []
+      setResultados(arr)
+      setSeleccion(new Set(arr.map((p) => p.codigo)))  // por defecto: todas marcadas
+    } catch { setResultados([]) } finally { setBuscando(false) }
+  }
+  function toggleSel(codigo: string) {
+    setSeleccion((s) => { const n = new Set(s); n.has(codigo) ? n.delete(codigo) : n.add(codigo); return n })
+  }
+  async function agregarPartidasSel() {
+    const elegidas = resultados.filter((p) => seleccion.has(p.codigo))
+    if (!elegidas.length) return
+    setAgregandoPartidas(true); setGuardado('saving')
+    try {
+      const nuevos: RegistroFase[] = []
+      for (const p of elegidas) {
+        const obs = [p.alcance, p.control ? `Control: ${p.control}` : ''].filter(Boolean).join(' · ')
+        const r = await fetch(`${API_BASE}/registros-fase/${proyectoId}/${fase}`, {
+          method: 'POST', headers,
+          body: JSON.stringify({
+            nombre: p.partida, estado: esquema.estados[0],
+            datos: { etapa: etapaKey, codigoPartida: p.codigo, unidad: p.unidad, especialidad: p.especialidad, observaciones: obs },
+          }),
+        })
+        if (r.ok) nuevos.push(await r.json())
+      }
+      setRegistros((prev) => [...prev, ...nuevos])
+      setGuardado('saved')
+      setModalPartidas(false); setBusqueda(''); setResultados([]); setSeleccion(new Set())
+    } catch { setGuardado('error') } finally { setAgregandoPartidas(false) }
   }
 
   // ── Fotos ──
@@ -369,12 +435,20 @@ export default function EtapaDetallePage() {
                 <h2 className="text-xs font-bold text-slate-600 uppercase tracking-widest">Actividades</h2>
                 <span className="text-[10px] text-slate-400">{regsEtapa.length}</span>
               </div>
-              <button
-                onClick={() => setAgregando(true)}
-                className="flex items-center gap-1 text-[11px] font-medium text-slate-400 hover:text-slate-900 transition-colors"
-              >
-                <Plus className="w-3 h-3" /> Actividad
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => { setModalPartidas(true); setBusqueda(etapa?.nombre ?? '') }}
+                  className="flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg transition-colors"
+                >
+                  <Wand2 className="w-3 h-3" /> Partidas IA
+                </button>
+                <button
+                  onClick={() => setAgregando(true)}
+                  className="flex items-center gap-1 text-[11px] font-medium text-slate-400 hover:text-slate-900 transition-colors"
+                >
+                  <Plus className="w-3 h-3" /> Actividad
+                </button>
+              </div>
             </div>
 
             {agregando && (
@@ -396,38 +470,118 @@ export default function EtapaDetallePage() {
               <>
                 <p className="text-[11px] text-slate-400 px-5 pt-2.5">Al marcar las actividades como completadas, la etapa avanza sola.</p>
                 <div className="divide-y divide-slate-50">
-                  {regsEtapa.map((reg) => (
-                    <div key={reg.id} className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50/60 transition-colors group">
-                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${estadoRegistroClase(reg.estado)}`}>{reg.estado}</span>
-                      <span className="text-sm text-slate-700 flex-1 min-w-0 truncate" title={reg.nombre}>{reg.nombre}</span>
-                      {/* Responsable de la actividad — selector del equipo (solo jefe asigna) */}
-                      <div className="flex items-center gap-1 shrink-0 w-44">
-                        <Users className="w-3.5 h-3.5 text-slate-300 shrink-0" />
-                        {puedeAsignar && equipo.length > 0 ? (
-                          <select
-                            value={reg.datos?.responsable ?? ''}
-                            onChange={(e) => asignarResponsable(reg, e.target.value)}
-                            className="w-full text-[11px] text-slate-600 border border-transparent hover:border-slate-200 focus:border-blue-400 rounded-md px-1.5 py-1 outline-none transition-colors bg-transparent focus:bg-white cursor-pointer"
-                          >
-                            <option value="">Sin asignar</option>
-                            {equipo.map((m) => <option key={m.id} value={m.nombre}>{m.nombre}</option>)}
-                          </select>
-                        ) : (
-                          <span className="w-full text-[11px] text-slate-500 truncate px-1.5">{reg.datos?.responsable || '—'}</span>
-                        )}
+                  {regsEtapa.map((reg) => {
+                    const d = reg.datos || {}
+                    const abierto = expandido === reg.id
+                    const parcial = (Number(d.cantidad) || 0) * (Number(d.precioUnitario) || 0)
+                    return (
+                    <div key={reg.id} className="group">
+                      <div className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50/60 transition-colors">
+                        <button
+                          onClick={() => setExpandido(abierto ? null : reg.id)}
+                          className="text-slate-300 hover:text-slate-600 shrink-0"
+                          title="Metrado y detalle"
+                        >
+                          <ChevronDown className={`w-4 h-4 transition-transform ${abierto ? 'rotate-180' : ''}`} />
+                        </button>
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${estadoRegistroClase(reg.estado)}`}>{reg.estado || '—'}</span>
+                        <div className="flex-1 min-w-0">
+                          <span className="text-sm text-slate-700 truncate block" title={reg.nombre}>{reg.nombre}</span>
+                          {d.codigoPartida && (
+                            <span className="text-[10px] text-slate-400 font-mono">
+                              WBS {d.codigoPartida}{d.unidad ? ` · ${d.unidad}` : ''}{parcial > 0 ? ` · S/ ${nf.format(parcial)}` : ''}
+                            </span>
+                          )}
+                        </div>
+                        {/* Responsable de la actividad — selector del equipo (solo jefe asigna) */}
+                        <div className="flex items-center gap-1 shrink-0 w-44">
+                          <Users className="w-3.5 h-3.5 text-slate-300 shrink-0" />
+                          {puedeAsignar && equipo.length > 0 ? (
+                            <select
+                              value={reg.datos?.responsable ?? ''}
+                              onChange={(e) => asignarResponsable(reg, e.target.value)}
+                              className="w-full text-[11px] text-slate-600 border border-transparent hover:border-slate-200 focus:border-blue-400 rounded-md px-1.5 py-1 outline-none transition-colors bg-transparent focus:bg-white cursor-pointer"
+                            >
+                              <option value="">Sin asignar</option>
+                              {equipo.map((m) => <option key={m.id} value={m.nombre}>{m.nombre}</option>)}
+                            </select>
+                          ) : (
+                            <span className="w-full text-[11px] text-slate-500 truncate px-1.5">{reg.datos?.responsable || '—'}</span>
+                          )}
+                        </div>
+                        <select
+                          value={reg.estado}
+                          onChange={(e) => cambiarEstado(reg, e.target.value)}
+                          className="text-[10px] border border-slate-200 rounded-md px-1.5 py-1 text-slate-500 outline-none focus:border-blue-400 bg-white"
+                        >
+                          {esquema.estados.map((e) => <option key={e} value={e}>{e}</option>)}
+                        </select>
+                        <button onClick={() => eliminarActividad(reg.id)} className="text-slate-300 hover:text-red-400 p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
-                      <select
-                        value={reg.estado}
-                        onChange={(e) => cambiarEstado(reg, e.target.value)}
-                        className="text-[10px] border border-slate-200 rounded-md px-1.5 py-1 text-slate-500 outline-none focus:border-blue-400 bg-white"
-                      >
-                        {esquema.estados.map((e) => <option key={e} value={e}>{e}</option>)}
-                      </select>
-                      <button onClick={() => eliminarActividad(reg.id)} className="text-slate-300 hover:text-red-400 p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+
+                      {/* Detalle: metrado + observaciones */}
+                      {abierto && (
+                        <div className="px-5 pb-4 pt-3 bg-slate-50/50 border-t border-slate-100">
+                          <div className="flex items-center gap-1.5 mb-2.5">
+                            <Ruler className="w-3.5 h-3.5 text-slate-400" />
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Metrado</span>
+                          </div>
+                          <div className="grid grid-cols-4 gap-2">
+                            <label className="block">
+                              <span className="text-[10px] text-slate-400">Unidad</span>
+                              <input
+                                value={d.unidad ?? ''}
+                                onChange={(e) => actualizarLocal(reg, { unidad: e.target.value })}
+                                onBlur={() => guardarDatos(reg)}
+                                placeholder="m2, und…"
+                                className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-blue-400 bg-white"
+                              />
+                            </label>
+                            <label className="block">
+                              <span className="text-[10px] text-slate-400">Cantidad</span>
+                              <input
+                                type="number" inputMode="decimal" value={d.cantidad ?? ''}
+                                onChange={(e) => actualizarLocal(reg, { cantidad: e.target.value })}
+                                onBlur={() => guardarDatos(reg)}
+                                placeholder="0"
+                                className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-blue-400 bg-white"
+                              />
+                            </label>
+                            <label className="block">
+                              <span className="text-[10px] text-slate-400">P.U. (S/)</span>
+                              <input
+                                type="number" inputMode="decimal" value={d.precioUnitario ?? ''}
+                                onChange={(e) => actualizarLocal(reg, { precioUnitario: e.target.value })}
+                                onBlur={() => guardarDatos(reg)}
+                                placeholder="0.00"
+                                className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-blue-400 bg-white"
+                              />
+                            </label>
+                            <div className="block">
+                              <span className="text-[10px] text-slate-400">Parcial (S/)</span>
+                              <div className="w-full text-sm font-semibold text-slate-800 border border-slate-100 bg-white rounded-lg px-2 py-1.5 tabular-nums">
+                                {nf.format(parcial)}
+                              </div>
+                            </div>
+                          </div>
+                          <label className="block mt-3">
+                            <span className="text-[10px] text-slate-400">Observaciones / alcance</span>
+                            <textarea
+                              value={d.observaciones ?? ''}
+                              onChange={(e) => actualizarLocal(reg, { observaciones: e.target.value })}
+                              onBlur={() => guardarDatos(reg)}
+                              rows={2}
+                              placeholder="Alcance, control de calidad, notas…"
+                              className="w-full text-sm border border-slate-200 rounded-lg px-2.5 py-2 outline-none focus:border-blue-400 bg-white resize-none"
+                            />
+                          </label>
+                        </div>
+                      )}
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </>
             )}
@@ -520,6 +674,74 @@ export default function EtapaDetallePage() {
           </div>
         </div>
       </div>
+
+      {/* Modal: biblioteca de partidas con IA */}
+      {modalPartidas && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => !agregandoPartidas && setModalPartidas(false)}>
+          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-2.5 px-5 py-4 border-b border-slate-100">
+              <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center shrink-0">
+                <Wand2 className="w-4 h-4 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm font-bold text-slate-900">Partidas con IA</h3>
+                <p className="text-[11px] text-slate-400 truncate">Busca un elemento en la biblioteca maestra y agrégalo como actividades a <span className="font-medium text-slate-600">{etapa?.nombre}</span></p>
+              </div>
+              <button onClick={() => setModalPartidas(false)} className="text-slate-300 hover:text-slate-600"><X className="w-5 h-5" /></button>
+            </div>
+
+            <div className="flex items-center gap-2 px-5 py-3 border-b border-slate-100">
+              <div className="flex-1 flex items-center gap-2 border border-slate-200 rounded-xl px-3 py-2 focus-within:border-blue-400">
+                <Search className="w-4 h-4 text-slate-300 shrink-0" />
+                <input
+                  autoFocus value={busqueda} onChange={(e) => setBusqueda(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') buscarCatalogo() }}
+                  placeholder="Ej: puerta contraplacada, muro drywall, tarrajeo…"
+                  className="flex-1 text-sm outline-none bg-transparent"
+                />
+              </div>
+              <button onClick={buscarCatalogo} disabled={buscando || !busqueda.trim()} className="flex items-center justify-center text-xs font-medium text-white bg-slate-900 hover:bg-slate-700 px-4 py-2.5 rounded-xl transition-colors disabled:opacity-40 min-w-18">
+                {buscando ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Buscar'}
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto">
+              {buscando ? (
+                <div className="flex items-center justify-center gap-2 text-sm text-slate-400 py-12"><Loader2 className="w-4 h-4 animate-spin" /> Buscando en el catálogo…</div>
+              ) : resultados.length === 0 ? (
+                <p className="text-xs text-slate-400 text-center py-12 px-6">Escribe un elemento y presiona <span className="font-medium text-slate-500">Buscar</span>. Traemos las partidas estándar del catálogo profesional (+8000 partidas).</p>
+              ) : (
+                <div className="divide-y divide-slate-50">
+                  {resultados.map((p) => {
+                    const sel = seleccion.has(p.codigo)
+                    return (
+                      <button key={p.codigo} onClick={() => toggleSel(p.codigo)} className="w-full flex items-start gap-3 px-5 py-2.5 text-left hover:bg-slate-50 transition-colors">
+                        <span className={`mt-0.5 w-4 h-4 rounded border shrink-0 flex items-center justify-center ${sel ? 'bg-blue-600 border-blue-600' : 'border-slate-300'}`}>
+                          {sel && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-slate-700">{p.partida}</p>
+                          <p className="text-[10px] text-slate-400 font-mono">WBS {p.codigo} · {p.unidad} · {p.especialidad}</p>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            {resultados.length > 0 && (
+              <div className="flex items-center justify-between gap-2 px-5 py-3 border-t border-slate-100 bg-slate-50/60">
+                <span className="text-xs text-slate-500">{seleccion.size} de {resultados.length} seleccionadas</span>
+                <button onClick={agregarPartidasSel} disabled={agregandoPartidas || seleccion.size === 0} className="flex items-center gap-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 px-4 py-2.5 rounded-xl transition-colors disabled:opacity-40">
+                  {agregandoPartidas ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                  Agregar{seleccion.size > 0 ? ` ${seleccion.size}` : ''} a la etapa
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Lightbox */}
       {lightbox && (
