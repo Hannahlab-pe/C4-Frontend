@@ -218,7 +218,7 @@ export default function CalzadurasFase({ proyectoId }: { proyectoId: string }) {
       <AppDialog open={modal !== null} onClose={() => setModal(null)} title={modal?.id ? 'Editar calzadura' : 'Nueva calzadura'} wide>
         {modal && (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Sector</label>
                 <input className={inputCls} autoFocus value={modal.sector ?? ''} onChange={(e) => setModal({ ...modal, sector: e.target.value })} placeholder="Ej: Sector A — vecino izquierda" />
@@ -228,7 +228,7 @@ export default function CalzadurasFase({ proyectoId }: { proyectoId: string }) {
                 <input className={inputCls} value={modal.ubicacion ?? ''} onChange={(e) => setModal({ ...modal, ubicacion: e.target.value })} placeholder="Ej: lindero izquierdo (Jr. Unión 123)" />
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Profundidad (m)</label>
                 <input type="number" step="0.1" className={inputCls} value={modal.profundidadM ?? ''} onChange={(e) => setModal({ ...modal, profundidadM: e.target.value as any })} placeholder="5.0" />
@@ -242,7 +242,7 @@ export default function CalzadurasFase({ proyectoId }: { proyectoId: string }) {
                 <input type="number" className={inputCls} value={modal.numAnillos ?? ''} onChange={(e) => setModal({ ...modal, numAnillos: e.target.value as any })} placeholder="4" />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Dimensiones del paño</label>
                 <input className={inputCls} value={modal.dimensiones ?? ''} onChange={(e) => setModal({ ...modal, dimensiones: e.target.value })} placeholder="0.60 × 1.50 m" />

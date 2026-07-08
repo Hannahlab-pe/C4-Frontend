@@ -1291,7 +1291,7 @@ export default function ProyectoFasePage() {
         {/* ════ TAB: PRESUPUESTO ════ */}
         {tab === 'presupuesto' && (
           <div className="max-w-2xl space-y-4">
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {[
                 { label: 'Presupuesto Total', value: fmtSoles(presupuestoTotal), color: 'text-slate-900' },
                 { label: 'Asignado',          value: fmtSoles(presupuestoAsignado), color: 'text-emerald-600' },
@@ -1508,7 +1508,7 @@ export default function ProyectoFasePage() {
       <AppDialog open={modalReg !== null} onClose={() => setModalReg(null)} title={modalReg?.id ? `Editar ${esquema.singular}` : esquema.nuevoLabel} wide>
         {modalReg && (
           <div className="space-y-5">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label={esquema.nombreLabel}>
                 <input className={inputCls} value={modalReg.nombre ?? ''} autoFocus
                   onChange={(e) => setModalReg((p) => ({ ...p!, nombre: e.target.value }))}
@@ -1588,7 +1588,7 @@ export default function ProyectoFasePage() {
             <Field label="Empresa">
               <input className={inputCls} value={modalContrata.empresa ?? ''} onChange={(e) => setModalContrata((p) => ({ ...p!, empresa: e.target.value }))} placeholder="Ej: Constructora Los Andes SAC" />
             </Field>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="Tipo de servicio">
                 <select className={inputCls} value={modalContrata.tipo ?? 'otro'} onChange={(e) => setModalContrata((p) => ({ ...p!, tipo: e.target.value }))}>
                   {TIPOS_CONTRATA.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
@@ -1606,7 +1606,7 @@ export default function ProyectoFasePage() {
             <Field label="Servicios (separados por coma)">
               <input className={inputCls} value={(modalContrata.servicios ?? []).join(', ')} onChange={(e) => setModalContrata((p) => ({ ...p!, servicios: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) }))} placeholder="Encofrado, Vaciado de concreto" />
             </Field>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="Presupuesto total (S/)">
                 <input type="number" className={inputCls} value={modalContrata.presupuestoTotal ?? 0} onChange={(e) => setModalContrata((p) => ({ ...p!, presupuestoTotal: Number(e.target.value) }))} />
               </Field>
@@ -1614,7 +1614,7 @@ export default function ProyectoFasePage() {
                 <input type="number" className={inputCls} value={modalContrata.presupuestoAsignado ?? 0} onChange={(e) => setModalContrata((p) => ({ ...p!, presupuestoAsignado: Number(e.target.value) }))} />
               </Field>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="Contacto">
                 <input className={inputCls} value={modalContrata.contactoNombre ?? ''} onChange={(e) => setModalContrata((p) => ({ ...p!, contactoNombre: e.target.value }))} placeholder="Nombre del responsable" />
               </Field>
@@ -1642,7 +1642,7 @@ export default function ProyectoFasePage() {
             <Field label="Nombre del equipo">
               <input className={inputCls} value={modalEquipo.nombre ?? ''} onChange={(e) => setModalEquipo((p) => ({ ...p!, nombre: e.target.value }))} placeholder="Ej: Grúa torre Potain MC85B" />
             </Field>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="Tipo">
                 <select className={inputCls} value={modalEquipo.tipo ?? 'otro'} onChange={(e) => setModalEquipo((p) => ({ ...p!, tipo: e.target.value }))}>
                   {TIPOS_EQUIPO.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
@@ -1656,7 +1656,7 @@ export default function ProyectoFasePage() {
                 </select>
               </Field>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="Empresa contratista">
                 <input className={inputCls} value={modalEquipo.contrataEmpresa ?? ''} onChange={(e) => setModalEquipo((p) => ({ ...p!, contrataEmpresa: e.target.value }))} />
               </Field>

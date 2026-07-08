@@ -101,7 +101,7 @@ export default function ProyectoPanelLayout() {
   }, [chatWidth])
 
   return (
-    <div className="flex flex-col -m-6" style={{ height: 'calc(100vh - 56px)' }}>
+    <div className="flex flex-col -m-4 md:-m-6" style={{ height: 'calc(100dvh - 56px)' }}>
 
       <style>{`
         @keyframes aurora-shift {
@@ -129,8 +129,8 @@ export default function ProyectoPanelLayout() {
 
       {/* Sub-nav */}
       <div className="bg-white border-b border-slate-200 shrink-0">
-        <div className="flex items-center justify-between px-2">
-          <div className="flex items-center overflow-x-auto">
+        <div className="flex items-center justify-between gap-1 px-1 md:px-2">
+          <div className="flex items-center overflow-x-auto flex-1 min-w-0">
             {TABS.map(({ slug, label, icon: Icon, end }) => {
               if (!puedeVer(slug)) {
                 return (
@@ -167,10 +167,10 @@ export default function ProyectoPanelLayout() {
           {mostrarChat && (
             <button
               onClick={() => setChatOpen(!chatOpen)}
-              className="aurora-btn flex items-center gap-1.5 mr-3 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white shadow-md transition-all duration-200"
+              className="aurora-btn flex items-center gap-1.5 shrink-0 mr-1 md:mr-3 px-2.5 md:px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white shadow-md transition-all duration-200"
             >
               <Sparkles className="w-3.5 h-3.5" />
-              Asistente C4
+              <span className="hidden sm:inline">Asistente C4</span>
             </button>
           )}
         </div>
@@ -196,22 +196,26 @@ export default function ProyectoPanelLayout() {
           )}
         </div>
 
-        {/* Sidebar chat — siempre en DOM para animar */}
+        {/* Chat — panel lateral en desktop, overlay a pantalla completa en mobile */}
         {id && mostrarChat && (
           <div
-            className="shrink-0 flex overflow-hidden transition-all duration-300 ease-in-out"
-            style={{ width: chatOpen ? chatWidth : 0, opacity: chatOpen ? 1 : 0 }}
+            className={
+              'bg-white overflow-hidden ' +
+              (chatOpen ? 'fixed inset-0 z-50 flex' : 'hidden') +
+              ' md:static md:inset-auto md:z-auto md:flex md:shrink-0 md:w-(--chat-w) md:transition-[width] md:duration-300 md:ease-in-out'
+            }
+            style={{ ['--chat-w' as any]: (chatOpen ? chatWidth : 0) + 'px' }}
           >
-            {/* Drag handle */}
+            {/* Drag handle — solo desktop */}
             {chatOpen && (
               <div
                 onMouseDown={onMouseDown}
-                className="resize-handle w-1 shrink-0 bg-slate-200 hover:bg-blue-400 cursor-col-resize transition-colors duration-150 active:bg-blue-500"
+                className="resize-handle hidden md:block w-1 shrink-0 bg-slate-200 hover:bg-blue-400 cursor-col-resize transition-colors duration-150 active:bg-blue-500"
                 title="Arrastrar para redimensionar"
               />
             )}
 
-            <div className="flex-1 overflow-hidden flex flex-col">
+            <div className="flex-1 overflow-hidden flex flex-col min-w-0">
               <ChatPanel proyectoId={id} />
             </div>
           </div>

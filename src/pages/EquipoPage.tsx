@@ -107,7 +107,7 @@ export default function EquipoPage() {
               <label className="block text-xs font-medium text-slate-600 mb-1">Contraseña</label>
               <input className={inputCls} type="text" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="mín. 4 caracteres" />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Rol</label>
                 <select className={inputCls} value={form.rolObra} onChange={(e) => setForm({ ...form, rolObra: e.target.value })}>
@@ -179,7 +179,7 @@ export default function EquipoPage() {
               <p className="font-semibold text-slate-800">Editar {editar.nombre}</p>
               <button onClick={() => setEditar(null)} className="text-slate-400 hover:text-slate-600"><X className="w-4 h-4" /></button>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Rol</label>
                 <select className={inputCls} value={editar.rolObra} onChange={(e) => setEditar({ ...editar, rolObra: e.target.value })}>

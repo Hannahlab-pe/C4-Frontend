@@ -3,9 +3,10 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import {
   BarChart2, HardHat, Archive, MapPin,
   SlidersHorizontal, CircleHelp,
-  LogOut, PanelLeftClose, PanelLeftOpen,
+  LogOut, PanelLeftClose, PanelLeftOpen, X,
 } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
+import { useUiStore } from '../store/uiStore'
 import AppDialog from './AppDialog'
 import clsx from 'clsx'
 
@@ -24,28 +25,45 @@ export default function Sidebar() {
   const { user, logout } = useAuthStore()
   const [collapsed, setCollapsed] = useState(false)
   const [confirmLogout, setConfirmLogout] = useState(false)
+  const mobileNavOpen = useUiStore((s) => s.mobileNavOpen)
+  const setMobileNav = useUiStore((s) => s.setMobileNav)
+  const closeMobile = () => setMobileNav(false)
 
   // Item full-width, recto (sin margen ni bordes redondeados). Activo: barra blanca, letras negras.
+  // En mobile el drawer siempre muestra etiquetas (colapsar es solo desktop).
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     clsx(
       'flex items-center text-[15px] transition-all duration-200 ease-out w-full',
-      collapsed ? 'justify-center py-3.5' : 'gap-3 px-5 py-3.5',
+      collapsed ? 'gap-3 px-5 py-3.5 md:justify-center md:gap-0 md:px-0' : 'gap-3 px-5 py-3.5',
       isActive
         ? 'bg-white text-slate-900 font-semibold'
         : 'font-medium text-slate-400 hover:bg-white/[0.06] hover:text-white',
     )
+  // La etiqueta se oculta solo cuando está colapsado EN DESKTOP.
+  const labelClass = collapsed ? 'md:hidden' : ''
 
   return (
     <>
+    {/* Backdrop en mobile */}
+    {mobileNavOpen && (
+      <div
+        onClick={closeMobile}
+        className="fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-sm md:hidden"
+      />
+    )}
+
     <aside className={clsx(
-      'bg-slate-900 flex flex-col h-full shrink-0 transition-all duration-300 overflow-hidden',
-      collapsed ? 'w-14' : 'w-60',
+      'bg-slate-900 flex flex-col h-full overflow-hidden z-50',
+      'fixed inset-y-0 left-0 w-64 shrink-0 md:static',
+      'transition-transform duration-300 ease-out md:transition-[width]',
+      mobileNavOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
+      collapsed ? 'md:w-14' : 'md:w-60',
     )}>
 
       {/* ── Logo (centrado) ──────────────────────────── */}
       <div className="relative flex items-center justify-center h-20 border-b border-white/6 shrink-0">
-        {!collapsed && (
-          <div className="flex flex-col items-center leading-none text-center">
+        {(!collapsed || mobileNavOpen) && (
+          <div className={clsx('flex flex-col items-center leading-none text-center', collapsed && 'md:hidden')}>
             <span className="text-white font-black text-3xl tracking-tight">
               C<span className="text-blue-500">4</span>
             </span>
@@ -54,10 +72,11 @@ export default function Sidebar() {
             </span>
           </div>
         )}
+        {/* Colapsar — solo desktop */}
         <button
           onClick={() => setCollapsed(!collapsed)}
           className={clsx(
-            'text-slate-600 hover:text-slate-300 transition-colors p-1 rounded',
+            'hidden md:block text-slate-600 hover:text-slate-300 transition-colors p-1 rounded',
             !collapsed && 'absolute right-2 top-3',
           )}
           title={collapsed ? 'Expandir' : 'Colapsar'}
@@ -66,30 +85,37 @@ export default function Sidebar() {
             ? <PanelLeftOpen  className="w-4 h-4" />
             : <PanelLeftClose className="w-4 h-4" />}
         </button>
+        {/* Cerrar drawer — solo mobile */}
+        <button
+          onClick={closeMobile}
+          className="md:hidden absolute right-3 top-3 text-slate-500 hover:text-white transition-colors p-1"
+          title="Cerrar menú"
+        >
+          <X className="w-5 h-5" />
+        </button>
       </div>
 
       {/* ── Nav ──────────────────────────────────────── */}
-      <nav className="flex-1 py-4 space-y-1">
+      <nav className="flex-1 py-4 space-y-1 overflow-y-auto">
         {navItems.map(({ to, icon: Icon, label }) => (
-          <NavLink key={to} to={to} title={collapsed ? label : undefined} className={linkClass}>
+          <NavLink key={to} to={to} onClick={closeMobile} title={collapsed ? label : undefined} className={linkClass}>
             <Icon className="w-4.5 h-4.5 shrink-0" />
-            {!collapsed && label}
+            <span className={labelClass}>{label}</span>
           </NavLink>
         ))}
 
         {user?.rol === 'admin' && (
           <>
-            <div className={clsx('pt-5 pb-1.5', collapsed ? 'px-2' : 'px-5')}>
-              {collapsed
-                ? <hr className="border-white/6" />
-                : <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-[0.18em]">
-                    Administración
-                  </p>}
+            <div className={clsx('pt-5 pb-1.5', collapsed ? 'px-5 md:px-2' : 'px-5')}>
+              <p className={clsx('text-[10px] font-semibold text-slate-600 uppercase tracking-[0.18em]', collapsed && 'md:hidden')}>
+                Administración
+              </p>
+              {collapsed && <hr className="hidden md:block border-white/6" />}
             </div>
             {adminItems.map(({ to, icon: Icon, label }) => (
-              <NavLink key={to} to={to} title={collapsed ? label : undefined} className={linkClass}>
+              <NavLink key={to} to={to} onClick={closeMobile} title={collapsed ? label : undefined} className={linkClass}>
                 <Icon className="w-4.5 h-4.5 shrink-0" />
-                {!collapsed && label}
+                <span className={labelClass}>{label}</span>
               </NavLink>
             ))}
           </>
@@ -97,14 +123,14 @@ export default function Sidebar() {
       </nav>
 
       {/* ── Footer ───────────────────────────────────── */}
-      <div className="pb-3 pt-2 border-t border-white/6 space-y-1">
+      <div className="pb-3 pt-2 border-t border-white/6 space-y-1 shrink-0">
         {[
           { to: '/configuracion', icon: SlidersHorizontal, label: 'Configuración' },
           { to: '/ayuda',         icon: CircleHelp,        label: 'Ayuda'          },
         ].map(({ to, icon: Icon, label }) => (
-          <NavLink key={to} to={to} title={collapsed ? label : undefined} className={linkClass}>
+          <NavLink key={to} to={to} onClick={closeMobile} title={collapsed ? label : undefined} className={linkClass}>
             <Icon className="w-4.5 h-4.5 shrink-0" />
-            {!collapsed && label}
+            <span className={labelClass}>{label}</span>
           </NavLink>
         ))}
 
@@ -113,11 +139,11 @@ export default function Sidebar() {
           title={collapsed ? 'Cerrar sesión' : undefined}
           className={clsx(
             'flex items-center text-[15px] font-medium w-full transition-all duration-200 ease-out text-slate-400 hover:bg-red-500/10 hover:text-red-400',
-            collapsed ? 'justify-center py-3.5' : 'gap-3 px-5 py-3.5',
+            collapsed ? 'gap-3 px-5 py-3.5 md:justify-center md:gap-0 md:px-0' : 'gap-3 px-5 py-3.5',
           )}
         >
           <LogOut className="w-4.5 h-4.5 shrink-0" />
-          {!collapsed && 'Cerrar sesión'}
+          <span className={labelClass}>Cerrar sesión</span>
         </button>
       </div>
     </aside>

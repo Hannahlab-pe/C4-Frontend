@@ -34,7 +34,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="h-screen overflow-hidden flex bg-white">
+    <div className="min-h-dvh flex bg-white">
 
       {/* ── Izquierda — formulario, minimalista ── */}
       <div className="w-full lg:w-[42%] shrink-0 flex flex-col px-8 sm:px-14 lg:px-16 py-10">

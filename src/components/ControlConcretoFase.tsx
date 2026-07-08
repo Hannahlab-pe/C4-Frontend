@@ -248,7 +248,7 @@ export default function ControlConcretoFase({ proyectoId }: { proyectoId: string
       <AppDialog open={modal !== null} onClose={() => setModal(null)} title={modal?.id ? 'Editar vaciado' : 'Nuevo vaciado'} wide>
         {modal && (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Elemento</label>
                 <input className={inputCls} autoFocus value={modal.elemento ?? ''} onChange={(e) => setModal({ ...modal, elemento: e.target.value })} placeholder="Ej: Losa, Columnas y placas, Platea" />
@@ -258,7 +258,7 @@ export default function ControlConcretoFase({ proyectoId }: { proyectoId: string
                 <input className={inputCls} value={modal.piso ?? ''} onChange={(e) => setModal({ ...modal, piso: e.target.value })} placeholder="Ej: 3" />
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Concreto (m³)</label>
                 <input type="number" step="0.1" className={inputCls} value={modal.volumenM3 ?? ''} onChange={(e) => setModal({ ...modal, volumenM3: e.target.value as any })} placeholder="28" />
@@ -274,7 +274,7 @@ export default function ControlConcretoFase({ proyectoId }: { proyectoId: string
                 <input className={inputCls} value={modal.slump ?? ''} onChange={(e) => setModal({ ...modal, slump: e.target.value })} placeholder='3"-4"' />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Fecha</label>
                 <input type="date" className={inputCls} value={modal.fecha ?? ''} onChange={(e) => setModal({ ...modal, fecha: e.target.value })} />

@@ -108,7 +108,7 @@ export default function SuelosFase({ proyectoId }: { proyectoId: string }) {
           <p className="text-[11px] text-blue-600 mt-3 flex items-center gap-1.5"><Sparkles className="w-3 h-3" /> Rellenado por la IA desde «{datos._fuente}». Revisa y ajusta lo que haga falta.</p>
         )}
 
-        <div className="grid grid-cols-2 gap-3 mt-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1">Laboratorio</label>
             <input className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" value={datos.laboratorio ?? ''} onChange={(e) => set('laboratorio', e.target.value)} placeholder="Ej: Laboratorio Geotécnico XYZ" />

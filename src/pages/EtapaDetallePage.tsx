@@ -329,7 +329,7 @@ export default function EtapaDetallePage() {
         </div>
       </div>
 
-      <div className="p-6 grid lg:grid-cols-3 gap-5 items-start">
+      <div className="p-4 md:p-6 grid lg:grid-cols-3 gap-5 items-start">
 
         {/* ── Columna principal: Galería + Actividades ── */}
         <div className="lg:col-span-2 space-y-5">
@@ -528,7 +528,7 @@ export default function EtapaDetallePage() {
                             <Ruler className="w-3.5 h-3.5 text-slate-400" />
                             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Metrado</span>
                           </div>
-                          <div className="grid grid-cols-4 gap-2">
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                             <label className="block">
                               <span className="text-[10px] text-slate-400">Unidad</span>
                               <input

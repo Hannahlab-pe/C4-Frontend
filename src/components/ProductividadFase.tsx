@@ -224,7 +224,7 @@ export default function ProductividadFase({ proyectoId, fase }: { proyectoId: st
       <AppDialog open={modal !== null} onClose={() => setModal(null)} title={modal?.id ? 'Editar partida' : 'Nueva partida'} wide>
         {modal && (
           <div className="space-y-4">
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="col-span-2">
                 <label className="block text-xs font-medium text-slate-600 mb-1">Partida</label>
                 <input className={inputCls} autoFocus value={modal.nombre ?? ''} onChange={(e) => setModal({ ...modal, nombre: e.target.value })} placeholder="Ej: Vaciado de losas, Excavación masiva" />
@@ -236,7 +236,7 @@ export default function ProductividadFase({ proyectoId, fase }: { proyectoId: st
                 </select>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Metrado total</label>
                 <input type="number" className={inputCls} value={modal.metradoTotal ?? ''} onChange={(e) => setModal({ ...modal, metradoTotal: e.target.value as any })} placeholder="350" />
@@ -246,7 +246,7 @@ export default function ProductividadFase({ proyectoId, fase }: { proyectoId: st
                 <input type="number" className={inputCls} value={modal.hhPresupuestadas ?? ''} onChange={(e) => setModal({ ...modal, hhPresupuestadas: e.target.value as any })} placeholder="180" />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Cuadrilla</label>
                 <input className={inputCls} value={modal.cuadrilla ?? ''} onChange={(e) => setModal({ ...modal, cuadrilla: e.target.value })} placeholder="Ej: Cuadrilla A — vaciados" />
