@@ -175,7 +175,7 @@ export default function CicloPisoFase({ proyectoId }: { proyectoId: string }) {
                     </div>
                     <span className="text-xs font-bold text-slate-600 tabular-nums w-8 text-right">{a}%</span>
                   </div>
-                  <button onClick={() => delPiso(p.id)} className="w-6 shrink-0 text-slate-300 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => delPiso(p.id)} className="w-6 shrink-0 text-slate-300 hover:text-red-400 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"><Trash2 className="w-3.5 h-3.5" /></button>
                 </div>
               )
             })}

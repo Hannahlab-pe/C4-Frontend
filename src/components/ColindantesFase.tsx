@@ -246,7 +246,7 @@ export default function ColindantesFase({ proyectoId }: { proyectoId: string }) 
                             {fotos.map((f) => (
                               <div key={f.id} className="relative group aspect-square rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
                                 <img src={f.dataUrl} alt={f.nombre} onClick={() => setLightbox(f.dataUrl)} className="w-full h-full object-cover cursor-zoom-in" />
-                                <button onClick={() => eliminarFoto(c.id, tipo, f.id)} className="absolute top-1 right-1 w-5 h-5 rounded bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500">
+                                <button onClick={() => eliminarFoto(c.id, tipo, f.id)} className="absolute top-1 right-1 w-5 h-5 rounded bg-black/50 text-white flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity hover:bg-red-500">
                                   <Trash2 className="w-2.5 h-2.5" />
                                 </button>
                               </div>
@@ -297,7 +297,7 @@ export default function ColindantesFase({ proyectoId }: { proyectoId: string }) 
                           </button>
                           <span className={`text-xs flex-1 ${r.estado === 'cerrado' ? 'text-slate-400 line-through' : 'text-slate-600'}`}>{r.descripcion}</span>
                           <span className="text-[10px] text-slate-400">{r.fecha}</span>
-                          <button onClick={() => delReclamo(c.id, r.id)} className="text-slate-300 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-3 h-3" /></button>
+                          <button onClick={() => delReclamo(c.id, r.id)} className="text-slate-300 hover:text-red-400 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"><Trash2 className="w-3 h-3" /></button>
                         </div>
                       ))}
                     </div>

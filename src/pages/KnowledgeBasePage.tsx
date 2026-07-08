@@ -194,7 +194,7 @@ export default function KnowledgeBasePage() {
                 <button
                   onClick={() => eliminar(doc.nombre)}
                   disabled={deleting === doc.nombre}
-                  className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-500 transition-all p-1.5 rounded-lg hover:bg-red-50"
+                  className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 text-slate-400 hover:text-red-500 transition-all p-1.5 rounded-lg hover:bg-red-50"
                   title="Eliminar documento"
                 >
                   {deleting === doc.nombre

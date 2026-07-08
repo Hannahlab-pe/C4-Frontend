@@ -231,7 +231,7 @@ export default function CronogramaPage() {
               <div key={t.id} className="flex items-center hover:bg-slate-50 rounded-md group">
                 <div className="shrink-0 pr-2 py-0.5 flex items-center gap-2" style={{ width: `${LABEL_W}%` }}>
                   <p className="text-[11px] text-slate-600 truncate flex-1" title={t.nombre}>{t.nombre}</p>
-                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                  <div className="flex items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0">
                     <button onClick={() => setDur(t.id, -1)} className="w-4 h-4 rounded bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500"><Minus className="w-2.5 h-2.5" /></button>
                     <span className="text-[10px] text-slate-400 w-6 text-center">{t.duracion}s</span>
                     <button onClick={() => setDur(t.id, +1)} className="w-4 h-4 rounded bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500"><Plus className="w-2.5 h-2.5" /></button>

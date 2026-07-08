@@ -297,7 +297,7 @@ export default function EtapaDetallePage() {
       <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={onArchivos} />
 
       {/* ── Header de la etapa ── */}
-      <div className={`border-b ${est.border} ${est.bg} px-6 pt-4 pb-5`}>
+      <div className={`border-b ${est.border} ${est.bg} px-4 md:px-6 pt-4 pb-5`}>
         <button
           onClick={() => navigate(`/proyectos/${proyectoId}/panel/${fase}`)}
           className="flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-800 transition-colors mb-3"
@@ -381,11 +381,11 @@ export default function EtapaDetallePage() {
                     />
                     <button
                       onClick={() => eliminarFoto(f.id)}
-                      className="absolute top-1.5 right-1.5 w-6 h-6 rounded-lg bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500"
+                      className="absolute top-1.5 right-1.5 w-6 h-6 rounded-lg bg-black/50 text-white flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity hover:bg-red-500"
                     >
                       <Trash2 className="w-3 h-3" />
                     </button>
-                    <p className="absolute bottom-0 inset-x-0 px-2 py-1 text-[9px] text-white bg-linear-to-t from-black/70 to-transparent truncate opacity-0 group-hover:opacity-100 transition-opacity">
+                    <p className="absolute bottom-0 inset-x-0 px-2 py-1 text-[9px] text-white bg-linear-to-t from-black/70 to-transparent truncate opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                       {f.nombre}
                     </p>
                   </div>
@@ -476,49 +476,55 @@ export default function EtapaDetallePage() {
                     const parcial = (Number(d.cantidad) || 0) * (Number(d.precioUnitario) || 0)
                     return (
                     <div key={reg.id} className="group">
-                      <div className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50/60 transition-colors">
-                        <button
-                          onClick={() => setExpandido(abierto ? null : reg.id)}
-                          className="text-slate-300 hover:text-slate-600 shrink-0"
-                          title="Metrado y detalle"
-                        >
-                          <ChevronDown className={`w-4 h-4 transition-transform ${abierto ? 'rotate-180' : ''}`} />
-                        </button>
-                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${estadoRegistroClase(reg.estado)}`}>{reg.estado || '—'}</span>
-                        <div className="flex-1 min-w-0">
-                          <span className="text-sm text-slate-700 truncate block" title={reg.nombre}>{reg.nombre}</span>
-                          {d.codigoPartida && (
-                            <span className="text-[10px] text-slate-400 font-mono">
-                              WBS {d.codigoPartida}{d.unidad ? ` · ${d.unidad}` : ''}{parcial > 0 ? ` · S/ ${nf.format(parcial)}` : ''}
-                            </span>
-                          )}
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-3 px-4 sm:px-5 py-3 hover:bg-slate-50/60 transition-colors">
+                        {/* Línea 1 en mobile: chevron + estado + nombre */}
+                        <div className="flex items-center gap-2 sm:gap-3 w-full sm:flex-1 min-w-0">
+                          <button
+                            onClick={() => setExpandido(abierto ? null : reg.id)}
+                            className="text-slate-300 hover:text-slate-600 shrink-0"
+                            title="Metrado y detalle"
+                          >
+                            <ChevronDown className={`w-4 h-4 transition-transform ${abierto ? 'rotate-180' : ''}`} />
+                          </button>
+                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${estadoRegistroClase(reg.estado)}`}>{reg.estado || '—'}</span>
+                          <div className="flex-1 min-w-0">
+                            <span className="text-sm text-slate-700 truncate block" title={reg.nombre}>{reg.nombre}</span>
+                            {d.codigoPartida && (
+                              <span className="text-[10px] text-slate-400 font-mono">
+                                WBS {d.codigoPartida}{d.unidad ? ` · ${d.unidad}` : ''}{parcial > 0 ? ` · S/ ${nf.format(parcial)}` : ''}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        {/* Responsable de la actividad — selector del equipo (solo jefe asigna) */}
-                        <div className="flex items-center gap-1 shrink-0 w-44">
-                          <Users className="w-3.5 h-3.5 text-slate-300 shrink-0" />
-                          {puedeAsignar && equipo.length > 0 ? (
-                            <select
-                              value={reg.datos?.responsable ?? ''}
-                              onChange={(e) => asignarResponsable(reg, e.target.value)}
-                              className="w-full text-[11px] text-slate-600 border border-transparent hover:border-slate-200 focus:border-blue-400 rounded-md px-1.5 py-1 outline-none transition-colors bg-transparent focus:bg-white cursor-pointer"
-                            >
-                              <option value="">Sin asignar</option>
-                              {equipo.map((m) => <option key={m.id} value={m.nombre}>{m.nombre}</option>)}
-                            </select>
-                          ) : (
-                            <span className="w-full text-[11px] text-slate-500 truncate px-1.5">{reg.datos?.responsable || '—'}</span>
-                          )}
+                        {/* Línea 2 en mobile: responsable + estado + borrar (inline en desktop) */}
+                        <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto pl-6 sm:pl-0">
+                          {/* Responsable — selector del equipo (solo jefe asigna) */}
+                          <div className="flex items-center gap-1 flex-1 sm:flex-none sm:w-44 min-w-0">
+                            <Users className="w-3.5 h-3.5 text-slate-300 shrink-0" />
+                            {puedeAsignar && equipo.length > 0 ? (
+                              <select
+                                value={reg.datos?.responsable ?? ''}
+                                onChange={(e) => asignarResponsable(reg, e.target.value)}
+                                className="w-full text-[11px] text-slate-600 border border-transparent hover:border-slate-200 focus:border-blue-400 rounded-md px-1.5 py-1 outline-none transition-colors bg-transparent focus:bg-white cursor-pointer"
+                              >
+                                <option value="">Sin asignar</option>
+                                {equipo.map((m) => <option key={m.id} value={m.nombre}>{m.nombre}</option>)}
+                              </select>
+                            ) : (
+                              <span className="w-full text-[11px] text-slate-500 truncate px-1.5">{reg.datos?.responsable || '—'}</span>
+                            )}
+                          </div>
+                          <select
+                            value={reg.estado}
+                            onChange={(e) => cambiarEstado(reg, e.target.value)}
+                            className="text-[10px] border border-slate-200 rounded-md px-1.5 py-1 text-slate-500 outline-none focus:border-blue-400 bg-white shrink-0"
+                          >
+                            {esquema.estados.map((e) => <option key={e} value={e}>{e}</option>)}
+                          </select>
+                          <button onClick={() => eliminarActividad(reg.id)} className="shrink-0 text-slate-300 hover:text-red-400 p-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
-                        <select
-                          value={reg.estado}
-                          onChange={(e) => cambiarEstado(reg, e.target.value)}
-                          className="text-[10px] border border-slate-200 rounded-md px-1.5 py-1 text-slate-500 outline-none focus:border-blue-400 bg-white"
-                        >
-                          {esquema.estados.map((e) => <option key={e} value={e}>{e}</option>)}
-                        </select>
-                        <button onClick={() => eliminarActividad(reg.id)} className="text-slate-300 hover:text-red-400 p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
                       </div>
 
                       {/* Detalle: metrado + observaciones */}

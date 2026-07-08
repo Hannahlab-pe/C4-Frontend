@@ -212,7 +212,7 @@ export default function ProyectosPage() {
 
                 {/* Flecha hover */}
                 <ChevronRight className="absolute bottom-5 right-5 w-4 h-4 text-slate-300
-                  opacity-0 group-hover:opacity-100 group-hover:text-blue-500 translate-x-1 group-hover:translate-x-0 transition-all duration-200" />
+                  opacity-100 sm:opacity-0 sm:group-hover:opacity-100 group-hover:text-blue-500 translate-x-1 group-hover:translate-x-0 transition-all duration-200" />
               </button>
             )
           })}

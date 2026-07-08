@@ -228,7 +228,7 @@ export default function SeguridadFase({ proyectoId, fase }: { proyectoId: string
                     {c.item}
                   </span>
                   {c.critico && <span className="text-[9px] font-bold uppercase tracking-wide bg-red-50 text-red-600 border border-red-200 px-1.5 py-0.5 rounded shrink-0">Crítico</span>}
-                  <button onClick={() => delItem(c.id)} className="text-slate-300 hover:text-red-400 p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                  <button onClick={() => delItem(c.id)} className="text-slate-300 hover:text-red-400 p-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0">
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -287,7 +287,7 @@ export default function SeguridadFase({ proyectoId, fase }: { proyectoId: string
                     <p className="text-[11px] text-slate-400 mt-0.5">{i.fecha}</p>
                   </div>
                   <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${SEV[i.severidad].cls}`}>{SEV[i.severidad].txt}</span>
-                  <button onClick={() => delInc(i.id)} className="text-slate-300 hover:text-red-400 p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                  <button onClick={() => delInc(i.id)} className="text-slate-300 hover:text-red-400 p-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0">
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>

@@ -200,7 +200,7 @@ export default function MonitoreoFase({ proyectoId }: { proyectoId: string }) {
                         <span key={l.id} className="group inline-flex items-center gap-1 text-[11px] bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-slate-600">
                           <span className="text-slate-400">{l.fecha.slice(5)}</span>
                           <b className={Math.abs(l.valorMm) >= limite ? 'text-red-600' : 'text-slate-700'}>{l.valorMm} mm</b>
-                          <button onClick={() => delLectura(p.id, l.id)} className="text-slate-300 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"><X className="w-2.5 h-2.5" /></button>
+                          <button onClick={() => delLectura(p.id, l.id)} className="text-slate-300 hover:text-red-400 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"><X className="w-2.5 h-2.5" /></button>
                         </span>
                       ))}
                     </div>

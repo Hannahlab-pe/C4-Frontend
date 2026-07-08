@@ -740,7 +740,7 @@ export default function ProyectoFasePage() {
           <div className="flex items-center gap-1.5 shrink-0">
             <button
               onClick={() => { setAnotOpen(abierto ? null : reg.id); setAnotInput('') }}
-              className={`flex items-center gap-1 text-[10px] px-1.5 py-1 rounded-md transition-colors ${abierto || anotaciones.length ? 'text-blue-600 hover:text-blue-700' : 'text-slate-400 hover:text-slate-700 opacity-0 group-hover:opacity-100'}`}
+              className={`flex items-center gap-1 text-[10px] px-1.5 py-1 rounded-md transition-colors ${abierto || anotaciones.length ? 'text-blue-600 hover:text-blue-700' : 'text-slate-400 hover:text-slate-700 opacity-100 sm:opacity-0 sm:group-hover:opacity-100'}`}
               title="Anotaciones de la tarea"
             >
               <FileText className="w-3 h-3" /> {anotaciones.length > 0 ? anotaciones.length : ''}
@@ -748,14 +748,14 @@ export default function ProyectoFasePage() {
             <select
               value={reg.estado}
               onChange={(e) => cambiarEstadoRegistro(reg, e.target.value)}
-              className="text-[10px] border border-slate-200 rounded-md px-1.5 py-1 text-slate-500 outline-none focus:border-blue-400 bg-white opacity-0 group-hover:opacity-100 transition-opacity"
+              className="text-[10px] border border-slate-200 rounded-md px-1.5 py-1 text-slate-500 outline-none focus:border-blue-400 bg-white opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
             >
               {esquema.estados.map((e) => <option key={e} value={e}>{e}</option>)}
             </select>
-            <button onClick={() => setModalReg(reg)} className="text-[10px] text-slate-400 hover:text-slate-700 px-1.5 py-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button onClick={() => setModalReg(reg)} className="text-[10px] text-slate-400 hover:text-slate-700 px-1.5 py-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
               Editar
             </button>
-            <button onClick={() => eliminarRegistro(reg.id)} className="text-slate-300 hover:text-red-400 p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button onClick={() => eliminarRegistro(reg.id)} className="text-slate-300 hover:text-red-400 p-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
               <Trash2 className="w-3 h-3" />
             </button>
           </div>
@@ -795,32 +795,32 @@ export default function ProyectoFasePage() {
         accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" onChange={onArchivoElegido} />
 
       {/* ── Header unificado ── */}
-      <div className="bg-white border-b border-slate-200 px-6 pt-5">
-        <div className="flex items-center gap-4 mb-4">
+      <div className="bg-white border-b border-slate-200 px-4 md:px-6 pt-4 md:pt-5">
+        <div className="flex items-center gap-3 md:gap-4 mb-4">
           <div className="relative w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center shrink-0">
             <Icon className="w-5 h-5 text-white" />
             <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${config.accent}`} />
           </div>
           <div className="flex-1 min-w-0">
-            <h1 className="text-base font-bold text-slate-900 leading-tight">{config.nombre}</h1>
+            <h1 className="text-base font-bold text-slate-900 leading-tight truncate">{config.nombre}</h1>
             <p className="text-xs text-slate-400 mt-0.5 truncate">{config.descripcion}</p>
           </div>
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-2 md:gap-3 shrink-0">
             <div className="text-right">
-              <p className="text-[10px] text-slate-400 uppercase tracking-wider">Avance de fase</p>
+              <p className="text-[10px] text-slate-400 uppercase tracking-wider whitespace-nowrap">Avance<span className="hidden sm:inline"> de fase</span></p>
               <p className="text-sm font-bold text-slate-900">{avanceGlobal}%</p>
             </div>
-            <div className="w-28 bg-slate-100 rounded-full h-1.5">
+            <div className="hidden sm:block w-20 md:w-28 bg-slate-100 rounded-full h-1.5">
               <div className="bg-slate-900 h-1.5 rounded-full transition-all duration-500" style={{ width: `${avanceGlobal}%` }} />
             </div>
           </div>
         </div>
 
-        {/* KPIs */}
-        <div className="grid border border-slate-200 rounded-t-2xl divide-x divide-slate-100 bg-slate-50/50"
-          style={{ gridTemplateColumns: `repeat(${kpis.length}, minmax(0, 1fr))` }}>
+        {/* KPIs — en mobile 3 por fila como mini-cards; en desktop tira dividida */}
+        <div className="grid grid-cols-3 gap-2 mb-3 md:gap-0 md:mb-0 md:[grid-template-columns:var(--kpi-cols)] md:border md:border-slate-200 md:rounded-t-2xl md:divide-x md:divide-slate-100 md:bg-slate-50/50"
+          style={{ ['--kpi-cols' as any]: `repeat(${kpis.length}, minmax(0, 1fr))` }}>
           {kpis.map((k) => (
-            <div key={k.label} className="px-4 py-3">
+            <div key={k.label} className="px-3 md:px-4 py-2.5 md:py-3 rounded-xl md:rounded-none border border-slate-200 md:border-0 bg-slate-50/50 md:bg-transparent">
               <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-0.5 truncate">{k.label}</p>
               <p className="text-sm font-bold text-slate-900 truncate" title={k.value}>{k.value}</p>
             </div>
@@ -847,7 +847,7 @@ export default function ProyectoFasePage() {
         </div>
       </div>
 
-      <div className="p-6">
+      <div className="p-4 md:p-6">
 
         {/* ════ TAB: ETAPAS DE OBRA (pipeline) ════ */}
         {tab === 'etapas' && (
@@ -894,13 +894,13 @@ export default function ProyectoFasePage() {
                 {/* Cronograma horizontal de etapas */}
                 <div className="bg-white rounded-2xl border border-slate-200 px-5 py-4">
                   <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-4">Cronograma de etapas</p>
-                  <div className="flex items-start">
+                  <div className="flex items-start overflow-x-auto pb-1">
                     {etapas.map((etapa, idx) => {
                       const pct = avanceEtapa(fase!, etapas, etapa.key, registros)
                       const est = estadoEtapaInfo(pct)
                       const esUltima = idx === etapas.length - 1
                       return (
-                        <div key={etapa.key} className="flex-1 flex flex-col items-center min-w-0 c4-reveal" style={{ animationDelay: `${idx * 60}ms` }}>
+                        <div key={etapa.key} className="flex-1 flex flex-col items-center min-w-[76px] md:min-w-0 c4-reveal" style={{ animationDelay: `${idx * 60}ms` }}>
                           <div className="flex items-center w-full">
                             <div className={`h-1 flex-1 rounded-full ${idx === 0 ? 'opacity-0' : estadoEtapaInfo(avanceEtapa(fase!, etapas, etapas[idx - 1].key, registros)).bar}`} />
                             <button
@@ -948,22 +948,22 @@ export default function ProyectoFasePage() {
 
                         {/* Card de etapa */}
                         <div className={`flex-1 bg-white rounded-2xl border ${est.border} overflow-hidden ${esUltima ? '' : 'mb-4'}`}>
-                          <div className={`flex items-center justify-between px-4 py-3 border-b border-slate-100 ${est.bg}`}>
+                          <div className={`flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between px-4 py-3 border-b border-slate-100 ${est.bg}`}>
                             <button
                               onClick={() => navigate(`/proyectos/${proyectoId}/panel/${fase}/${etapa.key}`)}
-                              className="min-w-0 text-left group flex items-center gap-2"
+                              className="min-w-0 w-full sm:flex-1 text-left group flex items-start gap-2"
                             >
-                              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${est.dot}`} />
+                              <span className={`w-1.5 h-1.5 mt-1.5 rounded-full shrink-0 ${est.dot}`} />
                               <span className="min-w-0">
-                                <span className="flex items-center gap-2">
+                                <span className="flex items-center gap-2 flex-wrap">
                                   <span className="text-sm font-semibold text-slate-800 group-hover:text-slate-950">{etapa.nombre}</span>
                                   <span className={`text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded ${est.bg} ${est.text} border ${est.border}`}>{est.label}</span>
                                 </span>
                                 <span className="block text-[11px] text-slate-400 truncate">{etapa.descripcion}</span>
                               </span>
                             </button>
-                            <div className="flex items-center gap-3 shrink-0">
-                              <div className="flex items-center gap-2 w-28">
+                            <div className="flex items-center gap-2 sm:gap-3 shrink-0 w-full sm:w-auto">
+                              <div className="flex items-center gap-2 flex-1 sm:flex-none sm:w-28">
                                 <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
                                   <div className={`h-full rounded-full transition-all ${est.bar}`} style={{ width: `${pct}%` }} />
                                 </div>
@@ -972,18 +972,18 @@ export default function ProyectoFasePage() {
                               {esquema.conEtapaEnForm && (
                                 <button
                                   onClick={() => setModalReg({ nombre: '', estado: esquema.estados[0], datos: { etapa: etapa.key } })}
-                                  className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-slate-900 font-medium transition-colors"
+                                  className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-slate-900 font-medium transition-colors shrink-0"
                                 >
                                   <Plus className="w-3 h-3" /> Actividad
                                 </button>
                               )}
                               <button
                                 onClick={() => navigate(`/proyectos/${proyectoId}/panel/${fase}/${etapa.key}`)}
-                                className="flex items-center gap-1 text-[11px] text-blue-600 hover:text-blue-500 font-medium transition-colors"
+                                className="flex items-center gap-1 text-[11px] text-blue-600 hover:text-blue-500 font-medium transition-colors shrink-0"
                               >
                                 <ImageIcon className="w-3 h-3" /> Abrir <ChevronRight className="w-3 h-3" />
                               </button>
-                              <div className="flex items-center gap-0.5 border-l border-slate-200 pl-2 ml-1">
+                              <div className="hidden sm:flex items-center gap-0.5 border-l border-slate-200 pl-2 ml-1">
                                 <button onClick={() => moverEtapa(idx, -1)} disabled={idx === 0} title="Subir" className="text-slate-300 hover:text-slate-600 disabled:opacity-30 disabled:hover:text-slate-300 p-0.5">
                                   <ChevronUp className="w-3.5 h-3.5" />
                                 </button>
@@ -1161,7 +1161,7 @@ export default function ProyectoFasePage() {
                             )}
                           </>
                         )}
-                        <button onClick={() => eliminarDoc(doc.id)} className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-400 transition-all p-1">
+                        <button onClick={() => eliminarDoc(doc.id)} className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 text-slate-300 hover:text-red-400 transition-all p-1">
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
@@ -1401,7 +1401,7 @@ export default function ProyectoFasePage() {
                     </span>
                     <button
                       onClick={() => eliminarTarea(tarea.id)}
-                      className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-400 transition-all p-0.5 rounded shrink-0"
+                      className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 text-slate-300 hover:text-red-400 transition-all p-0.5 rounded shrink-0"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>

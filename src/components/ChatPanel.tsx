@@ -384,7 +384,7 @@ export default function ChatPanel({ proyectoId }: Props) {
               <div key={doc.id} className="flex items-center gap-1.5 group">
                 <FileText className="w-3 h-3 text-slate-400 shrink-0" />
                 <span className="text-[10px] text-slate-600 flex-1 truncate">{doc.nombre}</span>
-                <button onClick={() => eliminarDoc(doc.id)} className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-300 hover:text-red-400">
+                <button onClick={() => eliminarDoc(doc.id)} className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity text-slate-300 hover:text-red-400">
                   <Trash2 className="w-3 h-3" />
                 </button>
               </div>

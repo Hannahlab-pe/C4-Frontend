@@ -201,7 +201,7 @@ export default function ProyectoPanelLayout() {
           <div
             className={
               'bg-white overflow-hidden ' +
-              (chatOpen ? 'fixed inset-0 z-50 flex' : 'hidden') +
+              (chatOpen ? 'fixed inset-0 z-50 flex chat-mobile-in' : 'hidden') +
               ' md:static md:inset-auto md:z-auto md:flex md:shrink-0 md:w-(--chat-w) md:transition-[width] md:duration-300 md:ease-in-out'
             }
             style={{ ['--chat-w' as any]: (chatOpen ? chatWidth : 0) + 'px' }}

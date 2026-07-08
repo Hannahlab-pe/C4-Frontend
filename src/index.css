@@ -23,6 +23,15 @@ body {
   animation: pageIn 0.22s ease-out both;
 }
 
+/* Chat: entrada tipo "sheet" (slide-up + fade) solo en mobile */
+@keyframes chatSlideUp {
+  from { opacity: 0; transform: translateY(28px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+@media (max-width: 767px) {
+  .chat-mobile-in { animation: chatSlideUp 0.3s cubic-bezier(0.22, 1, 0.36, 1) both; }
+}
+
 /* Reveal escalonado de etapas (cuando la IA / plantilla las genera) */
 @keyframes revealUp {
   from { opacity: 0; transform: translateY(12px) scale(0.985); }

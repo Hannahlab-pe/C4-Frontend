@@ -82,7 +82,7 @@ export default function EquipoPage() {
   )
 
   return (
-    <div className="h-full overflow-y-auto p-6 max-w-4xl space-y-5">
+    <div className="h-full overflow-y-auto p-4 md:p-6 max-w-4xl space-y-5">
       <div>
         <h2 className="text-lg font-bold text-slate-800">Equipo del proyecto</h2>
         <p className="text-xs text-slate-400 mt-0.5">
@@ -160,8 +160,8 @@ export default function EquipoPage() {
                   </span>
                   {soyJefe && !esJefeProy && (
                     <div className="flex items-center gap-1 shrink-0">
-                      <button onClick={() => setEditar(m)} className="text-slate-300 hover:text-slate-600 p-1 opacity-0 group-hover:opacity-100 transition-opacity"><Pencil className="w-3.5 h-3.5" /></button>
-                      <button onClick={() => quitar(m)} className="text-slate-300 hover:text-red-400 p-1 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => setEditar(m)} className="text-slate-300 hover:text-slate-600 p-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"><Pencil className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => quitar(m)} className="text-slate-300 hover:text-red-400 p-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"><Trash2 className="w-3.5 h-3.5" /></button>
                     </div>
                   )}
                 </div>

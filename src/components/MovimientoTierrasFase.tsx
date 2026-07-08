@@ -159,7 +159,7 @@ export default function MovimientoTierrasFase({ proyectoId }: { proyectoId: stri
                     <div className={`h-full rounded-full transition-all ${e2.bar}`} style={{ width: `${p}%` }} />
                   </div>
                   <span className="text-xs font-bold text-slate-600 tabular-nums w-9 text-right">{p}%</span>
-                  <button onClick={() => delSotano(s.id)} className="text-slate-300 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => delSotano(s.id)} className="text-slate-300 hover:text-red-400 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"><Trash2 className="w-3.5 h-3.5" /></button>
                 </div>
               )
             })}

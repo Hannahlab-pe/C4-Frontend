@@ -228,7 +228,7 @@ export default function ControlConcretoFase({ proyectoId }: { proyectoId: string
                             <span className="text-slate-400">{p.edad}d</span>
                             <b className={bajo ? 'text-red-600' : 'text-slate-800'}>{p.resistencia}</b>
                             <span className="text-slate-400">({pct}%)</span>
-                            <button onClick={() => delProbeta(v.id, p.id)} className="text-slate-300 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"><X className="w-2.5 h-2.5" /></button>
+                            <button onClick={() => delProbeta(v.id, p.id)} className="text-slate-300 hover:text-red-400 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"><X className="w-2.5 h-2.5" /></button>
                           </span>
                         )
                       })}
