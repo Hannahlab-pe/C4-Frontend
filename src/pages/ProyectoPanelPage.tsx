@@ -9,7 +9,7 @@ import {
   Hammer, HardHat, Building2, PaintBucket, ClipboardList,
   Loader2, BarChart3, Sparkles, ChevronRight,
   CheckCircle2, AlertTriangle, XCircle,
-  Layers, Home, Car, Maximize2,
+  Layers, Home, Car, Maximize2, FileDown,
 } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 import { API_BASE } from '../lib/config'
@@ -86,6 +86,21 @@ export default function ProyectoPanelPage() {
   const [loading, setLoading] = useState(true)
   const [analisis, setAnalisis] = useState<Analisis | null>(null)
   const [avances, setAvances] = useState<FaseAvance[]>([])
+  const [descargando, setDescargando] = useState(false)
+
+  async function descargarReporte() {
+    if (descargando || !id) return
+    setDescargando(true)
+    try {
+      const r = await fetch(`${API_BASE}/chat/reporte-obra/${id}`, { headers: { Authorization: `Bearer ${token}` } })
+      if (!r.ok) throw new Error()
+      const blob = await r.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url; a.download = 'reporte-obra.pdf'
+      document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url)
+    } catch { /* noop */ } finally { setDescargando(false) }
+  }
 
   const cargar = useCallback(() => {
     if (!id) return
@@ -190,11 +205,22 @@ export default function ProyectoPanelPage() {
             {analisis?.distrito ? `${analisis.distrito} · ` : ''}Indicadores y avance de obra
           </p>
         </div>
-        {veredicto && (
-          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm font-semibold ${veredicto.cls}`}>
-            <veredicto.Icon className="w-4 h-4" /> {veredicto.txt}
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          {veredicto && (
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm font-semibold ${veredicto.cls}`}>
+              <veredicto.Icon className="w-4 h-4" /> {veredicto.txt}
+            </div>
+          )}
+          <button
+            onClick={descargarReporte}
+            disabled={descargando}
+            title="Descargar reporte de obra en PDF (avance, seguridad, calidad)"
+            className="flex items-center gap-1.5 text-xs font-medium text-slate-600 border border-slate-200 hover:bg-slate-50 hover:border-slate-300 px-3 py-1.5 rounded-xl transition-colors disabled:opacity-50"
+          >
+            {descargando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileDown className="w-3.5 h-3.5" />}
+            Reporte PDF
+          </button>
+        </div>
       </div>
 
       {/* ── KPIs financieros ── */}
