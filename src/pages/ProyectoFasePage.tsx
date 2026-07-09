@@ -5,7 +5,7 @@ import {
   CheckCircle2, Circle, Clock, Plus, Trash2, Loader2,
   Truck, Wrench, Sparkles, Table2, ListChecks, FileText,
   DollarSign, Phone, AlertCircle, GitBranch, FolderCheck,
-  Upload, ShieldAlert, ShieldCheck, FileCheck2, ChevronRight, ChevronUp, ChevronDown, Pencil, ImageIcon, Users, Layers, Mountain, Activity, TestTube2, Gauge, type LucideIcon,
+  Upload, ShieldAlert, ShieldCheck, FileCheck2, ChevronRight, ChevronUp, ChevronDown, Pencil, ImageIcon, Users, Layers, Mountain, Activity, TestTube2, Gauge, BadgeCheck, type LucideIcon,
 } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 import { setGuardado } from '../store/guardadoStore'
@@ -20,6 +20,7 @@ import MonitoreoFase from '../components/MonitoreoFase'
 import ControlConcretoFase from '../components/ControlConcretoFase'
 import CicloPisoFase from '../components/CicloPisoFase'
 import ProductividadFase from '../components/ProductividadFase'
+import CalidadFase from '../components/CalidadFase'
 import {
   ESQUEMAS_REGISTRO, kpisDeRegistros, estadoRegistroClase,
   agruparPorEtapa, avanceEtapa, avanceFase, avanceUnidad, estadoEtapaInfo,
@@ -674,6 +675,7 @@ export default function ProyectoFasePage() {
   const TABS = [
     { key: 'etapas',      label: 'Etapas de obra', icon: GitBranch },
     ...(fase !== 'administracion' ? [{ key: 'seguridad', label: 'Seguridad', icon: ShieldCheck }] : []),
+    ...(fase !== 'administracion' ? [{ key: 'calidad', label: 'Calidad', icon: BadgeCheck }] : []),
     ...(fase === 'excavacion' ? [{ key: 'suelos', label: 'Estudio de Suelos', icon: Mountain }, { key: 'calzaduras', label: 'Calzaduras', icon: Layers }, { key: 'tierras', label: 'Mov. de tierras', icon: Truck }, { key: 'monitoreo', label: 'Monitoreo', icon: Activity }] : []),
     ...(fase === 'construccion' ? [{ key: 'concreto', label: 'Control de concreto', icon: TestTube2 }, { key: 'ciclo', label: 'Ciclo de piso', icon: Building2 }] : []),
     ...(['demolicion', 'excavacion', 'construccion', 'acabados'].includes(fase ?? '') ? [{ key: 'productividad', label: 'Productividad', icon: Gauge }] : []),
@@ -1052,6 +1054,8 @@ export default function ProyectoFasePage() {
 
         {/* ════ TAB: SEGURIDAD (SSOMA / G.050) ════ */}
         {tab === 'seguridad' && <SeguridadFase proyectoId={proyectoId!} fase={fase!} />}
+
+        {tab === 'calidad' && <CalidadFase proyectoId={proyectoId!} fase={fase!} />}
 
         {/* ════ TAB: COLINDANTES / VECINOS ════ */}
         {tab === 'colindantes' && <ColindantesFase proyectoId={proyectoId!} />}
