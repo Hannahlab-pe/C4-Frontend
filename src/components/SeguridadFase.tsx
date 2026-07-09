@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   ShieldCheck, ShieldAlert, AlertTriangle, CheckCircle2, Circle,
-  Plus, Trash2, Loader2, Sparkles, X, MinusCircle,
+  Plus, Trash2, Loader2, Sparkles, X, Check, Minus,
 } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 import { API_BASE } from '../lib/config'
@@ -53,6 +53,7 @@ export default function SeguridadFase({ proyectoId, fase }: { proyectoId: string
   const [inc, setInc] = useState<{ descripcion: string; severidad: Incidente['severidad']; fecha: string } | null>(null)
   const lastSaved = useRef('{}')
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingSave = useRef(false)
 
   const cargar = () => {
     fetch(`${API_BASE}/fases-detalle/${proyectoId}/${detalleKey}`, { headers })
@@ -75,8 +76,15 @@ export default function SeguridadFase({ proyectoId, fase }: { proyectoId: string
       if (det?.fase && det.fase !== fase) return
       cargar()
     }
+    // Refresco en vivo por el poll (cambios hechos por la IA / Telegram),
+    // sin pisar una edición local en curso.
+    const onPoll = () => { if (!pendingSave.current) cargar() }
     window.addEventListener('c4:seguridad-updated', onUpd)
-    return () => window.removeEventListener('c4:seguridad-updated', onUpd)
+    window.addEventListener('c4:proyecto-updated', onPoll)
+    return () => {
+      window.removeEventListener('c4:seguridad-updated', onUpd)
+      window.removeEventListener('c4:proyecto-updated', onPoll)
+    }
   }, [proyectoId, fase])
 
   function persistir(next: SegDatos) {
@@ -84,11 +92,14 @@ export default function SeguridadFase({ proyectoId, fase }: { proyectoId: string
     const json = JSON.stringify(next)
     if (json === lastSaved.current) return
     if (timer.current) clearTimeout(timer.current)
+    pendingSave.current = true
     setGuardado('saving')
     timer.current = setTimeout(() => {
       fetch(`${API_BASE}/fases-detalle/${proyectoId}/${detalleKey}`, {
         method: 'PUT', headers, body: JSON.stringify({ datos: next }),
-      }).then((r) => { if (!r.ok) throw new Error(); lastSaved.current = json; setGuardado('saved') }).catch(() => setGuardado('error'))
+      }).then((r) => { if (!r.ok) throw new Error(); lastSaved.current = json; setGuardado('saved') })
+        .catch(() => setGuardado('error'))
+        .finally(() => { pendingSave.current = false })
     }, 600)
   }
 
@@ -102,10 +113,11 @@ export default function SeguridadFase({ proyectoId, fase }: { proyectoId: string
   const abiertos = incidentes.filter((i) => i.estado === 'abierto').length
 
   // ── Checklist ──
-  const cicloEstado = (e: ItemCheck['estado']): ItemCheck['estado'] =>
-    e === 'pendiente' ? 'cumple' : e === 'cumple' ? 'no_aplica' : 'pendiente'
-  const toggleItem = (id: string) =>
-    persistir({ ...datos, checklist: checklist.map((c) => c.id === id ? { ...c, estado: cicloEstado(c.estado) } : c) })
+  // Tap en la fila: alterna cumple ↔ pendiente (predecible). "N/A" es un botón aparte.
+  const toggleCumple = (id: string) =>
+    persistir({ ...datos, checklist: checklist.map((c) => c.id === id ? { ...c, estado: c.estado === 'cumple' ? 'pendiente' : 'cumple' } : c) })
+  const toggleNA = (id: string) =>
+    persistir({ ...datos, checklist: checklist.map((c) => c.id === id ? { ...c, estado: c.estado === 'no_aplica' ? 'pendiente' : 'no_aplica' } : c) })
   const delItem = (id: string) => persistir({ ...datos, checklist: checklist.filter((c) => c.id !== id) })
   const addItemFn = () => {
     if (!nuevoItem.trim()) return
@@ -200,6 +212,19 @@ export default function SeguridadFase({ proyectoId, fase }: { proyectoId: string
             </button>
           </div>
 
+          {/* Barra de progreso del checklist */}
+          {checklist.length > 0 && (
+            <div className="flex items-center gap-3 px-4 sm:px-5 py-2.5 border-b border-slate-100 bg-slate-50/40">
+              <div className="flex-1 h-2 bg-slate-200/70 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${cumplimiento >= 80 ? 'bg-emerald-500' : cumplimiento >= 50 ? 'bg-amber-500' : 'bg-slate-400'}`}
+                  style={{ width: `${cumplimiento}%` }}
+                />
+              </div>
+              <span className="text-xs font-bold text-slate-600 tabular-nums shrink-0">{cumplidos}/{aplica.length}</span>
+            </div>
+          )}
+
           {addItem && (
             <div className="flex items-center gap-2 px-5 py-3 border-b border-slate-100 bg-slate-50/60">
               <input
@@ -217,22 +242,46 @@ export default function SeguridadFase({ proyectoId, fase }: { proyectoId: string
             <p className="text-xs text-slate-400 px-5 py-6 text-center">Sin ítems. Agrégalos o usa la plantilla G.050.</p>
           ) : (
             <div className="divide-y divide-slate-50">
-              {checklist.map((c) => (
-                <div key={c.id} className="flex items-center gap-3 px-5 py-2.5 hover:bg-slate-50/60 transition-colors group">
-                  <button onClick={() => toggleItem(c.id)} title="Cambiar estado" className="shrink-0">
-                    {c.estado === 'cumple' ? <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                      : c.estado === 'no_aplica' ? <MinusCircle className="w-4 h-4 text-slate-300" />
-                      : <Circle className="w-4 h-4 text-slate-300" />}
-                  </button>
-                  <span className={`text-sm flex-1 min-w-0 ${c.estado === 'no_aplica' ? 'text-slate-400 line-through' : c.estado === 'cumple' ? 'text-slate-500' : 'text-slate-700'}`}>
-                    {c.item}
-                  </span>
-                  {c.critico && <span className="text-[9px] font-bold uppercase tracking-wide bg-red-50 text-red-600 border border-red-200 px-1.5 py-0.5 rounded shrink-0">Crítico</span>}
-                  <button onClick={() => delItem(c.id)} className="text-slate-300 hover:text-red-400 p-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0">
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))}
+              {checklist.map((c) => {
+                const cumple = c.estado === 'cumple'
+                const na = c.estado === 'no_aplica'
+                return (
+                  <div key={c.id} className={`flex items-center gap-2.5 sm:gap-3 pr-3 sm:pr-4 transition-colors duration-200 group ${cumple ? 'bg-emerald-50/60' : na ? 'bg-slate-50/70' : 'hover:bg-slate-50/60'}`}>
+                    {/* Toda la fila (checkbox + texto) es el área tappable */}
+                    <button
+                      onClick={() => toggleCumple(c.id)}
+                      className="flex items-center gap-3 flex-1 min-w-0 text-left pl-4 sm:pl-5 py-3 active:scale-[0.99] transition-transform"
+                    >
+                      <span className={`shrink-0 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all duration-200 ${
+                        cumple ? 'bg-emerald-500 border-emerald-500 shadow-sm shadow-emerald-500/30'
+                          : na ? 'bg-slate-200 border-slate-200'
+                          : 'bg-white border-slate-300 group-hover:border-emerald-400'
+                      }`}>
+                        {cumple && <Check className="w-3.5 h-3.5 text-white check-pop" strokeWidth={3} />}
+                        {na && <Minus className="w-3 h-3 text-slate-400" strokeWidth={3} />}
+                      </span>
+                      <span className={`text-sm min-w-0 transition-colors ${na ? 'text-slate-400 line-through' : cumple ? 'text-slate-500' : 'text-slate-700'}`}>
+                        {c.item}
+                      </span>
+                    </button>
+                    {c.critico && (
+                      <span className={`text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded shrink-0 transition-colors ${cumple ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>
+                        {cumple ? 'OK' : 'Crítico'}
+                      </span>
+                    )}
+                    <button
+                      onClick={() => toggleNA(c.id)}
+                      title="Marcar como No aplica"
+                      className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100 ${na ? 'bg-slate-200 text-slate-600' : 'text-slate-300 hover:text-slate-600 hover:bg-slate-100'}`}
+                    >
+                      N/A
+                    </button>
+                    <button onClick={() => delItem(c.id)} className="text-slate-300 hover:text-red-400 p-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )
+              })}
             </div>
           )}
         </section>
