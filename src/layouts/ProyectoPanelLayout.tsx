@@ -2,7 +2,7 @@ import { useRef, useCallback, useEffect, useState } from 'react'
 import { Outlet, NavLink, useParams, useLocation, Navigate, Link } from 'react-router-dom'
 import {
   LayoutDashboard, Hammer, HardHat,
-  Building2, PaintBucket, ClipboardList, Sparkles, BarChart2, Settings2, Users, Lock, Loader2,
+  Building2, PaintBucket, ClipboardList, Sparkles, BarChart2, Settings2, Users, Lock, Loader2, Truck,
 } from 'lucide-react'
 import ChatPanel from '../components/ChatPanel'
 import GuardadoIndicator from '../components/GuardadoIndicator'
@@ -18,6 +18,7 @@ const TABS = [
   { slug: 'construccion',   label: 'Construcción',    icon: Building2 },
   { slug: 'acabados',       label: 'Acabados',        icon: PaintBucket },
   { slug: 'administracion', label: 'Administración',  icon: ClipboardList },
+  { slug: 'logistica',      label: 'Logística',       icon: Truck },
   { slug: 'equipo',         label: 'Equipo',          icon: Users },
   { slug: 'configuracion',  label: 'Configuración',   icon: Settings2 },
 ]
