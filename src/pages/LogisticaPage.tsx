@@ -10,7 +10,7 @@ import { setGuardado } from '../store/guardadoStore'
 
 interface Recepcion { id: string; fecha: string; hora?: string; material: string; cantidad?: number; unidad?: string; proveedor?: string; guia?: string; foto?: string }
 interface Camion { id: string; fecha: string; hora?: string; tipo: 'ingreso' | 'salida'; placa?: string; motivo: string; viajes?: number; empresa?: string; foto?: string }
-interface LogisticaDatos { recepciones?: Recepcion[]; camiones?: Camion[] }
+interface LogisticaDatos { recepciones?: Recepcion[]; camiones?: Camion[]; desmonteMetaViajes?: number; desmonteMetaM3?: number }
 
 const uid = () => Math.random().toString(36).slice(2, 10)
 const hoy = () => new Date().toISOString().slice(0, 10)
@@ -66,6 +66,7 @@ export default function LogisticaPage() {
   const recHoy = recepciones.filter((r) => r.fecha === hoy()).length
   const camHoy = camiones.filter((c) => c.fecha === hoy()).length
   const viajesDesmonte = camiones.filter((c) => c.motivo === 'desmonte' && c.tipo === 'salida').reduce((a, c) => a + (Number(c.viajes) || 1), 0)
+  const metaViajes = Number(datos.desmonteMetaViajes) || 0
 
   async function leerFoto(file: File): Promise<string> {
     return new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result)); fr.onerror = rej; fr.readAsDataURL(file) })
@@ -116,8 +117,19 @@ export default function LogisticaPage() {
         </div>
         <div className="bg-white rounded-2xl border border-slate-200 px-5 py-4">
           <p className="text-[11px] text-slate-400 uppercase tracking-wider mb-1.5">Viajes de desmonte</p>
-          <p className="text-2xl font-black tabular-nums leading-none text-amber-600">{viajesDesmonte}</p>
-          <p className="text-[11px] text-slate-400 mt-1.5">volquetes que salieron</p>
+          <p className="text-2xl font-black tabular-nums leading-none text-amber-600">
+            {viajesDesmonte}{metaViajes > 0 && <span className="text-base text-slate-400 font-bold"> / {metaViajes}</span>}
+          </p>
+          {metaViajes > 0 ? (
+            <>
+              <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden mt-2">
+                <div className="h-full bg-amber-500 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, Math.round((viajesDesmonte / metaViajes) * 100))}%` }} />
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">{Math.round((viajesDesmonte / metaViajes) * 100)}% del volumen previsto{datos.desmonteMetaM3 ? ` (${datos.desmonteMetaM3.toLocaleString('es-PE')} m³)` : ''}</p>
+            </>
+          ) : (
+            <p className="text-[11px] text-slate-400 mt-1.5">volquetes que salieron</p>
+          )}
         </div>
       </div>
 
