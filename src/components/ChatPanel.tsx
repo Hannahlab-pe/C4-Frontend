@@ -372,7 +372,7 @@ export default function ChatPanel({ proyectoId }: Props) {
         <input
           ref={docInputRef}
           type="file"
-          accept=".pdf,.dxf,image/*"
+          accept=".pdf,.dxf,.xlsx,.xls,.csv,image/*"
           className="hidden"
           onChange={(e) => { const f = e.target.files?.[0]; if (f) subirDocumento(f); e.target.value = '' }}
         />
@@ -406,7 +406,7 @@ export default function ChatPanel({ proyectoId }: Props) {
             </div>
           </div>
         )}
-        <input ref={fileInputRef} type="file" accept=".pdf,.dxf,image/*" className="hidden" onChange={handleFileChange} />
+        <input ref={fileInputRef} type="file" accept=".pdf,.dxf,.xlsx,.xls,.csv,image/*" className="hidden" onChange={handleFileChange} />
         <div className="flex items-end gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 focus-within:border-blue-300 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
           <button
             onClick={() => fileInputRef.current?.click()}
