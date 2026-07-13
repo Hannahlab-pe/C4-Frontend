@@ -388,9 +388,17 @@ export default function CronogramaObraPage() {
 
       {/* Modal editar actividad */}
       <AppDialog open={edit !== null} onClose={() => setEdit(null)} title="Editar actividad del cronograma">
-        {edit && (
+        {edit && (() => {
+          const regE = Object.values(regsPorFase).flat().find((r) => r.id === edit.registroId)
+          const f = regE?.datos?.fundamentoDuracion
+          return (
           <div className="space-y-4">
             <p className="text-sm font-semibold text-slate-800">{edit.nombre}</p>
+            {f && (
+              <p className="text-[11px] text-blue-700 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2 leading-relaxed">
+                📐 Duración calculada: <b>{Number(f.metrado).toLocaleString('es-PE')} {f.unidad ?? ''}</b> ÷ {f.rendimiento_diario}/día{f.frentes > 1 ? ` ÷ ${f.frentes} frentes` : ''} = <b>{f.dias_utiles} días útiles</b> (metrado ÷ rendimiento).
+              </p>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Fecha de inicio</label>
@@ -414,7 +422,8 @@ export default function CronogramaObraPage() {
               <button onClick={guardarEdit} disabled={guardandoEdit} className="flex-1 text-sm font-medium text-white bg-slate-900 hover:bg-slate-700 py-2.5 rounded-xl transition-colors disabled:opacity-50">{guardandoEdit ? 'Guardando...' : 'Guardar'}</button>
             </div>
           </div>
-        )}
+          )
+        })()}
       </AppDialog>
     </div>
   )
