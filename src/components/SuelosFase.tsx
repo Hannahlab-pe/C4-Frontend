@@ -30,13 +30,22 @@ export default function SuelosFase({ proyectoId }: { proyectoId: string }) {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => {
-    setLoading(true)
+  function cargar(showLoader = true) {
+    if (showLoader) setLoading(true)
     fetch(`${API_BASE}/fases-detalle/${proyectoId}/${detalleKey}`, { headers })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => { const v = (d?.datos ?? {}) as Suelo; lastSaved.current = JSON.stringify(v); setDatos(v) })
       .catch(() => {})
       .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    cargar()
+    // La IA puede plasmar el EMS desde el chat → refrescar la ficha en vivo
+    const onUpd = () => cargar(false)
+    window.addEventListener('c4:suelos-updated', onUpd)
+    return () => window.removeEventListener('c4:suelos-updated', onUpd)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [proyectoId])
 
   function persistir(next: Suelo) {

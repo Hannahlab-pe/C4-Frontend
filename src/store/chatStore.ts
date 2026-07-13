@@ -150,6 +150,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             emit('c4:calzaduras-updated', {})
           } else if (eventType === 'tierras_actualizadas') {
             emit('c4:tierras-updated', {})
+          } else if (eventType === 'suelos_actualizados') {
+            emit('c4:suelos-updated', {})
           } else if (eventType === 'concreto_actualizado') {
             emit('c4:concreto-updated', {})
           } else if (eventType === 'productividad_actualizada') {
