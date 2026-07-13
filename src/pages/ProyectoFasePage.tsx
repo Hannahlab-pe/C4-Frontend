@@ -20,6 +20,7 @@ import MonitoreoFase from '../components/MonitoreoFase'
 import ControlConcretoFase from '../components/ControlConcretoFase'
 import CicloPisoFase from '../components/CicloPisoFase'
 import ProductividadFase from '../components/ProductividadFase'
+import MetradoFase from '../components/MetradoFase'
 import CalidadFase from '../components/CalidadFase'
 import {
   ESQUEMAS_REGISTRO, kpisDeRegistros, estadoRegistroClase,
@@ -676,7 +677,7 @@ export default function ProyectoFasePage() {
     { key: 'etapas',      label: 'Etapas de obra', icon: GitBranch },
     ...(fase !== 'administracion' ? [{ key: 'seguridad', label: 'Seguridad', icon: ShieldCheck }] : []),
     ...(fase !== 'administracion' ? [{ key: 'calidad', label: 'Calidad', icon: BadgeCheck }] : []),
-    ...(fase === 'excavacion' ? [{ key: 'suelos', label: 'Estudio de Suelos', icon: Mountain }, { key: 'calzaduras', label: 'Calzaduras', icon: Layers }, { key: 'tierras', label: 'Mov. de tierras', icon: Truck }, { key: 'monitoreo', label: 'Monitoreo', icon: Activity }] : []),
+    ...(fase === 'excavacion' ? [{ key: 'suelos', label: 'Estudio de Suelos', icon: Mountain }, { key: 'calzaduras', label: 'Calzaduras', icon: Layers }, { key: 'tierras', label: 'Mov. de tierras', icon: Truck }, { key: 'metrado', label: 'Metrado y costo', icon: ClipboardList }, { key: 'monitoreo', label: 'Monitoreo', icon: Activity }] : []),
     ...(fase === 'construccion' ? [{ key: 'concreto', label: 'Control de concreto', icon: TestTube2 }, { key: 'ciclo', label: 'Ciclo de piso', icon: Building2 }] : []),
     ...(['demolicion', 'excavacion', 'construccion', 'acabados'].includes(fase ?? '') ? [{ key: 'productividad', label: 'Productividad', icon: Gauge }] : []),
     ...((fase === 'demolicion' || fase === 'excavacion') ? [{ key: 'colindantes', label: 'Colindantes', icon: Users }] : []),
@@ -1068,6 +1069,9 @@ export default function ProyectoFasePage() {
 
         {/* ════ TAB: MOVIMIENTO DE TIERRAS (excavación) ════ */}
         {tab === 'tierras' && <MovimientoTierrasFase proyectoId={proyectoId!} />}
+
+        {/* ════ TAB: METRADO Y COSTO (excavación) ════ */}
+        {tab === 'metrado' && <MetradoFase proyectoId={proyectoId!} />}
 
         {/* ════ TAB: MONITOREO DE ASENTAMIENTOS (excavación) ════ */}
         {tab === 'monitoreo' && <MonitoreoFase proyectoId={proyectoId!} />}
