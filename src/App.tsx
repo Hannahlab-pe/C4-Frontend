@@ -9,6 +9,7 @@ import ProyectoFasePage from './pages/ProyectoFasePage'
 import EtapaDetallePage from './pages/EtapaDetallePage'
 import AnalisisPage from './pages/AnalisisPage'
 import CronogramaPage from './pages/CronogramaPage'
+import CronogramaObraPage from './pages/CronogramaObraPage'
 import KnowledgeBasePage from './pages/KnowledgeBasePage'
 import NormativasAdminPage from './pages/NormativasAdminPage'
 import ProyectoConfigPage from './pages/ProyectoConfigPage'
@@ -44,6 +45,7 @@ export default function App() {
           <Route index element={<ProyectoPanelPage />} />
           <Route path="analisis" element={<AnalisisPage />} />
           <Route path="cronograma" element={<CronogramaPage />} />
+          <Route path="cronograma-obra" element={<CronogramaObraPage />} />
           <Route path="equipo" element={<EquipoPage />} />
           <Route path="logistica" element={<LogisticaPage />} />
           <Route path="configuracion" element={<ProyectoConfigPage />} />
