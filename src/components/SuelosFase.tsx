@@ -1,21 +1,76 @@
 import { useEffect, useRef, useState } from 'react'
-import { Mountain, Loader2, ScanText, Droplets, Gauge, FlaskConical, Sparkles } from 'lucide-react'
+import { Mountain, Loader2, ScanText, Droplets, Gauge, ShieldCheck, Sparkles, FileText } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 import { API_BASE } from '../lib/config'
 import { setGuardado } from '../store/guardadoStore'
 
-type Suelo = Record<string, string> & { _fuente?: string }
+type Suelo = Record<string, string> & { _fuente?: string; _archivoId?: string; _archivoNombre?: string }
 
-const CAMPOS: { key: string; label: string; placeholder: string }[] = [
-  { key: 'tipoSuelo',         label: 'Tipo de suelo (SUCS)',     placeholder: 'Ej: Grava arenosa mal graduada (GP)' },
-  { key: 'capacidadPortante', label: 'Capacidad portante adm.',  placeholder: 'Ej: 2.5 kg/cm²' },
-  { key: 'nivelFreatico',     label: 'Nivel freático',           placeholder: 'Ej: -8.0 m (o no detectado)' },
-  { key: 'profCimentacion',   label: 'Prof. de cimentación',     placeholder: 'Ej: -3.0 m' },
-  { key: 'agresividad',       label: 'Agresividad al concreto',  placeholder: 'Ej: Moderada (sulfatos)' },
-  { key: 'anguloFriccion',    label: 'Ángulo de fricción (φ)',   placeholder: 'Ej: 32°' },
-  { key: 'cohesion',          label: 'Cohesión (c)',             placeholder: 'Ej: 0.10 kg/cm²' },
-  { key: 'asentamiento',      label: 'Asentamiento estimado',    placeholder: 'Ej: 2.5 cm' },
+type Campo = { key: string; label: string; placeholder: string; area?: boolean }
+
+const SECCIONES: { titulo: string; campos: Campo[] }[] = [
+  {
+    titulo: 'Identificación del estudio',
+    campos: [
+      { key: 'laboratorio',           label: 'Laboratorio',              placeholder: 'Ej: Laboratorio Geotécnico XYZ' },
+      { key: 'fecha',                 label: 'Fecha del EMS',            placeholder: 'Ej: noviembre 2025' },
+      { key: 'numeroInforme',         label: 'N° de informe',            placeholder: 'Ej: 5673' },
+      { key: 'ubicacion',             label: 'Ubicación del terreno',    placeholder: 'Ej: Av. Larco 123, Miraflores' },
+      { key: 'numeroCalicatas',       label: 'N° de calicatas/sondajes', placeholder: 'Ej: 3 calicatas' },
+      { key: 'profundidadInvestigada',label: 'Prof. investigada',        placeholder: 'Ej: 24.0 m' },
+    ],
+  },
+  {
+    titulo: 'Suelo y estratigrafía',
+    campos: [
+      { key: 'tipoSuelo',      label: 'Tipo de suelo (SUCS)', placeholder: 'Ej: Grava arenosa mal graduada (GP)' },
+      { key: 'nivelFreatico',  label: 'Nivel freático',       placeholder: 'Ej: No detectado / -8.0 m' },
+      { key: 'pesoEspecifico', label: 'Peso específico (γ)',  placeholder: 'Ej: 2.10 Ton/m³' },
+      { key: 'perfilEstratigrafico', label: 'Perfil estratigráfico (capas)', placeholder: 'Ej: 0–3.5m: arena limosa; 3.5–11m: grava densa…', area: true },
+    ],
+  },
+  {
+    titulo: 'Cimentación',
+    campos: [
+      { key: 'tipoCimentacion',   label: 'Tipo de cimentación',    placeholder: 'Ej: Zapatas aisladas / Platea' },
+      { key: 'capacidadPortante', label: 'Capacidad portante adm.', placeholder: 'Ej: 6.50 kg/cm²' },
+      { key: 'profCimentacion',   label: 'Prof. de cimentación',   placeholder: 'Ej: -17.50 m' },
+      { key: 'factorSeguridad',   label: 'Factor de seguridad',    placeholder: 'Ej: 3.0' },
+      { key: 'asentamiento',      label: 'Asentamiento estimado',  placeholder: 'Ej: 2.50 cm' },
+    ],
+  },
+  {
+    titulo: 'Parámetros de resistencia',
+    campos: [
+      { key: 'anguloFriccion', label: 'Ángulo de fricción (φ)', placeholder: 'Ej: 37°' },
+      { key: 'cohesion',       label: 'Cohesión (c)',           placeholder: 'Ej: 0.30 kg/cm²' },
+      { key: 'empujeActivo',   label: 'Empuje activo (Ka)',     placeholder: 'Ej: 0.25' },
+    ],
+  },
+  {
+    titulo: 'Sismicidad (E.030)',
+    campos: [
+      { key: 'zonaSismica', label: 'Zona sísmica', placeholder: 'Ej: 4' },
+      { key: 'factorZ',     label: 'Factor de zona (Z)', placeholder: 'Ej: 0.45' },
+      { key: 'tipoPerfil',  label: 'Tipo de perfil', placeholder: 'Ej: S1' },
+      { key: 'factorSuelo', label: 'Factor de suelo (S)', placeholder: 'Ej: 1.00' },
+      { key: 'periodoTp',   label: 'Período Tp', placeholder: 'Ej: 0.4 s' },
+      { key: 'periodoTl',   label: 'Período Tl', placeholder: 'Ej: 2.5 s' },
+    ],
+  },
+  {
+    titulo: 'Riesgos y agresividad',
+    campos: [
+      { key: 'licuacion',   label: 'Potencial de licuación', placeholder: 'Ej: No hay' },
+      { key: 'colapso',     label: 'Potencial de colapso',   placeholder: 'Ej: No hay' },
+      { key: 'expansion',   label: 'Potencial de expansión', placeholder: 'Ej: No hay' },
+      { key: 'agresividad', label: 'Agresividad al concreto', placeholder: 'Ej: Moderada (sulfatos)' },
+      { key: 'tipoCemento', label: 'Cemento recomendado',    placeholder: 'Ej: Tipo I / Tipo V' },
+    ],
+  },
 ]
+
+const inputCls = 'w-full text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100'
 
 export default function SuelosFase({ proyectoId }: { proyectoId: string }) {
   const token = useAuthStore((s) => s.token)
@@ -72,12 +127,27 @@ export default function SuelosFase({ proyectoId }: { proyectoId: string }) {
       const base64 = await new Promise<string>((res, rej) => {
         const fr = new FileReader(); fr.onload = () => res(String(fr.result).split(',')[1] ?? ''); fr.onerror = rej; fr.readAsDataURL(file)
       })
-      const r = await fetch(`${API_BASE}/chat/analizar-ems`, { method: 'POST', headers, body: JSON.stringify({ pdfBase64: base64, nombre: file.name }) })
+      const r = await fetch(`${API_BASE}/chat/analizar-ems`, { method: 'POST', headers, body: JSON.stringify({ pdfBase64: base64, nombre: file.name, proyectoId }) })
       const data = await r.json()
       if (data.error) { setError(data.error); return }
-      persistir({ ...datos, ...data.datos, _fuente: file.name })
+      persistir({ ...datos, ...data.datos, _fuente: file.name, _archivoId: data.archivoId, _archivoNombre: data.archivoNombre })
     } catch { setError('No se pudo analizar el EMS.') }
     finally { setAnalizando(false) }
+  }
+
+  async function verEms() {
+    if (!datos._archivoId) return
+    try {
+      const r = await fetch(`${API_BASE}/documentos/archivo/${datos._archivoId}`, { headers })
+      const d = await r.json()
+      if (!d?.base64) { setError('El PDF ya no está disponible.'); return }
+      const bin = atob(d.base64)
+      const bytes = new Uint8Array(bin.length)
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+      const url = URL.createObjectURL(new Blob([bytes], { type: d.mimeType || 'application/pdf' }))
+      window.open(url, '_blank')
+      setTimeout(() => URL.revokeObjectURL(url), 60000)
+    } catch { setError('No se pudo abrir el PDF.') }
   }
 
   if (loading) return (
@@ -87,9 +157,9 @@ export default function SuelosFase({ proyectoId }: { proyectoId: string }) {
   )
 
   const highlights = [
-    { label: 'Capacidad portante', value: datos.capacidadPortante || '—', icon: Gauge },
-    { label: 'Nivel freático',     value: datos.nivelFreatico || '—',     icon: Droplets },
-    { label: 'Agresividad',        value: datos.agresividad || '—',       icon: FlaskConical },
+    { label: 'Capacidad portante',   value: datos.capacidadPortante || '—',    icon: Gauge },
+    { label: 'Nivel freático',       value: datos.nivelFreatico || '—',        icon: Droplets },
+    { label: 'Sostenimiento',        value: datos.sistemaSostenimiento || '—', icon: ShieldCheck },
   ]
 
   return (
@@ -106,27 +176,23 @@ export default function SuelosFase({ proyectoId }: { proyectoId: string }) {
               <p className="text-xs text-slate-400">La base de toda la excavación y cimentación</p>
             </div>
           </div>
-          <button onClick={() => fileRef.current?.click()} disabled={analizando} className="flex items-center gap-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3.5 py-2 rounded-xl transition-colors disabled:opacity-50">
-            {analizando ? <Loader2 className="w-4 h-4 animate-spin" /> : <ScanText className="w-4 h-4" />}
-            {analizando ? 'Leyendo EMS...' : 'Analizar EMS (PDF) con IA'}
-          </button>
+          <div className="flex items-center gap-2">
+            {datos._archivoId && (
+              <button onClick={verEms} className="flex items-center gap-1.5 text-xs font-medium text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 px-3 py-2 rounded-xl transition-colors" title={datos._archivoNombre}>
+                <FileText className="w-4 h-4" /> Ver EMS
+              </button>
+            )}
+            <button onClick={() => fileRef.current?.click()} disabled={analizando} className="flex items-center gap-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3.5 py-2 rounded-xl transition-colors disabled:opacity-50">
+              {analizando ? <Loader2 className="w-4 h-4 animate-spin" /> : <ScanText className="w-4 h-4" />}
+              {analizando ? 'Leyendo EMS...' : 'Analizar EMS (PDF) con IA'}
+            </button>
+          </div>
         </div>
 
         {error && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2 mt-3">{error}</p>}
         {datos._fuente && !error && (
           <p className="text-[11px] text-blue-600 mt-3 flex items-center gap-1.5"><Sparkles className="w-3 h-3" /> Rellenado por la IA desde «{datos._fuente}». Revisa y ajusta lo que haga falta.</p>
         )}
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Laboratorio</label>
-            <input className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" value={datos.laboratorio ?? ''} onChange={(e) => set('laboratorio', e.target.value)} placeholder="Ej: Laboratorio Geotécnico XYZ" />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Fecha del EMS</label>
-            <input className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" value={datos.fecha ?? ''} onChange={(e) => set('fecha', e.target.value)} placeholder="Ej: marzo 2026" />
-          </div>
-        </div>
       </div>
 
       {/* Highlights */}
@@ -137,29 +203,40 @@ export default function SuelosFase({ proyectoId }: { proyectoId: string }) {
               <Icon className="w-3.5 h-3.5 text-slate-400" />
               <p className="text-[11px] text-slate-400 uppercase tracking-wider">{label}</p>
             </div>
-            <p className="text-lg font-black text-slate-900 leading-tight">{value}</p>
+            <p className="text-base font-black text-slate-900 leading-tight">{value}</p>
           </div>
         ))}
       </div>
 
-      {/* Parámetros */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-5">
-        <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Parámetros geotécnicos</p>
-        <div className="grid sm:grid-cols-2 gap-3">
-          {CAMPOS.map(({ key, label, placeholder }) => (
-            <div key={key}>
-              <label className="block text-xs font-medium text-slate-600 mb-1">{label}</label>
-              <input className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" value={datos[key] ?? ''} onChange={(e) => set(key, e.target.value)} placeholder={placeholder} />
-            </div>
-          ))}
+      {/* Secciones de parámetros */}
+      {SECCIONES.map((sec) => (
+        <div key={sec.titulo} className="bg-white rounded-2xl border border-slate-200 p-5">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">{sec.titulo}</p>
+          <div className="grid sm:grid-cols-2 gap-3">
+            {sec.campos.map(({ key, label, placeholder, area }) => (
+              <div key={key} className={area ? 'sm:col-span-2' : ''}>
+                <label className="block text-xs font-medium text-slate-600 mb-1">{label}</label>
+                {area ? (
+                  <textarea className={`${inputCls} resize-none leading-relaxed`} rows={2} value={datos[key] ?? ''} onChange={(e) => set(key, e.target.value)} placeholder={placeholder} />
+                ) : (
+                  <input className={inputCls} value={datos[key] ?? ''} onChange={(e) => set(key, e.target.value)} placeholder={placeholder} />
+                )}
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      ))}
 
-      {/* Recomendaciones */}
+      {/* Sostenimiento y recomendaciones */}
       <div className="bg-white rounded-2xl border border-slate-200 p-5">
-        <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Conclusiones y recomendaciones</p>
+        <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Sostenimiento y recomendaciones</p>
+        <div className="mb-3">
+          <label className="block text-xs font-medium text-slate-600 mb-1">Sistema de sostenimiento recomendado</label>
+          <input className={inputCls} value={datos.sistemaSostenimiento ?? ''} onChange={(e) => set('sistemaSostenimiento', e.target.value)} placeholder="Ej: Calzaduras + muros anclados" />
+        </div>
+        <label className="block text-xs font-medium text-slate-600 mb-1">Conclusiones y recomendaciones</label>
         <textarea
-          className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 resize-none leading-relaxed"
+          className={`${inputCls} resize-none leading-relaxed`}
           rows={5} value={datos.recomendaciones ?? ''} onChange={(e) => set('recomendaciones', e.target.value)}
           placeholder="Tipo de cimentación recomendada, profundidad de desplante, consideraciones para calzaduras y excavación, control del nivel freático..."
         />
