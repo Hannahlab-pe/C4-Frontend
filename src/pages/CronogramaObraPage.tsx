@@ -61,7 +61,11 @@ interface Row {
   atrasada: boolean
   hito: boolean
   groupId?: string   // para colapsar
+  costo?: number         // costo presupuestado (S/)
+  valorGanado?: number   // costo × avance
 }
+
+const soles = (n: number) => `S/ ${Math.round(n).toLocaleString('es-PE')}`
 
 export default function CronogramaObraPage() {
   const { id: proyectoId } = useParams<{ id: string }>()
@@ -74,17 +78,19 @@ export default function CronogramaObraPage() {
   const [colapsados, setColapsados] = useState<Set<string>>(new Set())
   const [dayW, setDayW] = useState(6)
   const [edit, setEdit] = useState<Row | null>(null)
-  const [editVals, setEditVals] = useState<{ fechaInicio: string; duracionDias: number; avance: number; responsable: string }>({ fechaInicio: '', duracionDias: 1, avance: 0, responsable: '' })
+  const [editVals, setEditVals] = useState<{ fechaInicio: string; duracionDias: number; avance: number; responsable: string; costo: number }>({ fechaInicio: '', duracionDias: 1, avance: 0, responsable: '', costo: 0 })
   const [guardandoEdit, setGuardandoEdit] = useState(false)
+  const [cfg, setCfg] = useState<any>({})
 
   const cargar = useCallback(() => {
     if (!proyectoId) return
-    Promise.all(
-      FASES.flatMap((f) => [
+    Promise.all([
+      ...FASES.flatMap((f) => [
         fetch(`${API_BASE}/fases-detalle/${proyectoId}/${f}__etapas`, { headers }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
         fetch(`${API_BASE}/registros-fase/${proyectoId}/${f}`, { headers }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
       ]),
-    ).then((res) => {
+      fetch(`${API_BASE}/fases-detalle/${proyectoId}/cronograma_config`, { headers }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    ]).then((res) => {
       const et: Record<string, EtapaFase[]> = {}
       const rg: Record<string, RegistroFase[]> = {}
       FASES.forEach((f, i) => {
@@ -92,6 +98,7 @@ export default function CronogramaObraPage() {
         rg[f] = Array.isArray(res[i * 2 + 1]) ? res[i * 2 + 1] : []
       })
       setEtapasPorFase(et); setRegsPorFase(rg)
+      setCfg(res[FASES.length * 2]?.datos ?? {})
     }).finally(() => setLoading(false))
   }, [proyectoId, headers])
 
@@ -167,15 +174,25 @@ export default function CronogramaObraPage() {
           const fin = ini ? addDays(ini, dur) : null
           const av = avanceReg(fase, r)
           const atrasada = !!(fin && fin < hoy && av < 100)
+          const costo = num(r.datos?.costoPresupuestado)
           all.push({
             id: `reg:${r.id}`, tipo: 'actividad', nivel: 2, fase,
             nombre: r.nombre || 'Actividad', inicio: ini, fin, avance: av,
             responsable: r.datos?.responsable, estado: r.estado, registroId: r.id,
             atrasada, hito: dur <= 1 && !!r.datos?.esHito, groupId: etId,
+            costo, valorGanado: Math.round(costo * av / 100),
           })
         }
       }
     }
+
+    // Rollup de costo a etapas y fases (suma de sus actividades)
+    const acum: Record<string, { c: number; vg: number }> = {}
+    for (const r of all) if (r.tipo === 'actividad') {
+      const bump = (gid?: string) => { if (!gid) return; (acum[gid] ??= { c: 0, vg: 0 }); acum[gid].c += r.costo ?? 0; acum[gid].vg += r.valorGanado ?? 0 }
+      bump(r.groupId); bump(`fase:${r.fase}`)
+    }
+    for (const r of all) if (r.tipo !== 'actividad' && acum[r.id]) { r.costo = acum[r.id].c; r.valorGanado = acum[r.id].vg }
 
     // padding del rango
     if (minD) minD = addDays(minD, -3)
@@ -186,8 +203,11 @@ export default function CronogramaObraPage() {
     const atrasadas = acts.filter((r) => r.atrasada).length
     const avanceGlobal = acts.length ? Math.round(acts.reduce((s, r) => s + r.avance, 0) / acts.length) : 0
     const duracion = minD && maxD ? diffDays(minD, maxD) : 0
+    const presupuesto = acts.reduce((s, r) => s + (r.costo ?? 0), 0)
+    const valorGanado = acts.reduce((s, r) => s + (r.valorGanado ?? 0), 0)
+    const avanceCosto = presupuesto ? Math.round(valorGanado / presupuesto * 100) : 0
 
-    return { rows: all, minD, maxD, kpis: { atrasadas, avanceGlobal, duracion, inicio: minD, fin: maxD, nActs: acts.length } }
+    return { rows: all, minD, maxD, kpis: { atrasadas, avanceGlobal, duracion, inicio: minD, fin: maxD, nActs: acts.length, presupuesto, valorGanado, avanceCosto } }
   }, [regsPorFase, etapasPorFase, colapsados, hoy])
 
   const totalDays = minD && maxD ? diffDays(minD, maxD) : 0
@@ -222,6 +242,7 @@ export default function CronogramaObraPage() {
       duracionDias: row.inicio && row.fin ? diffDays(row.inicio, row.fin) : 1,
       avance: row.avance,
       responsable: row.responsable ?? '',
+      costo: row.costo ?? 0,
     })
   }
 
@@ -236,6 +257,7 @@ export default function CronogramaObraPage() {
       duracionDias: Math.max(1, num(editVals.duracionDias)),
       avance: clamp(num(editVals.avance)),
       responsable: editVals.responsable || undefined,
+      costoPresupuestado: num(editVals.costo) || undefined,
     }
     try {
       const r = await fetch(`${API_BASE}/registros-fase/${edit.registroId}`, { method: 'PATCH', headers, body: JSON.stringify({ datos }) })
@@ -264,25 +286,38 @@ export default function CronogramaObraPage() {
             <p className="text-xs text-slate-300">Gantt de ejecución — actividades por fase, avance y atrasos</p>
           </div>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
           {[
             { label: 'Inicio', value: kpis.inicio ? fmtCorto(kpis.inicio) : '—' },
             { label: 'Fin estimado', value: kpis.fin ? fmtCorto(kpis.fin) : '—' },
-            { label: 'Duración', value: kpis.duracion ? `${kpis.duracion} días` : '—' },
-            { label: 'Avance global', value: `${kpis.avanceGlobal}%` },
-            { label: 'Atrasadas', value: String(kpis.atrasadas) },
+            { label: 'Avance físico', value: `${kpis.avanceGlobal}%` },
+            { label: 'Presupuesto', value: kpis.presupuesto ? soles(kpis.presupuesto) : '—' },
+            { label: 'Valor ganado', value: kpis.presupuesto ? `${soles(kpis.valorGanado)} · ${kpis.avanceCosto}%` : '—' },
+            { label: 'Atrasadas', value: String(kpis.atrasadas), alerta: kpis.atrasadas > 0 },
           ].map((k) => (
             <div key={k.label} className="bg-white/10 rounded-xl px-3 py-2.5">
               <p className="text-[10px] text-slate-300 mb-0.5">{k.label}</p>
-              <p className={`text-sm font-bold ${k.label === 'Atrasadas' && kpis.atrasadas > 0 ? 'text-red-300' : ''}`}>{k.value}</p>
+              <p className={`text-sm font-bold ${(k as any).alerta ? 'text-red-300' : ''}`}>{k.value}</p>
             </div>
           ))}
         </div>
       </div>
 
+      {/* Alerta de presupuesto excedido */}
+      {(() => {
+        const baseline = Number(cfg?.presupuestoBaseline) || 0
+        const exc = baseline && kpis.presupuesto > baseline ? kpis.presupuesto - baseline : 0
+        return exc > 0 ? (
+          <div className="bg-red-50 border-b border-red-200 px-6 py-2.5 flex items-center gap-2 text-sm text-red-700">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span><b>Presupuesto excedido</b> — el costo actual ({soles(kpis.presupuesto)}) supera la línea base ({soles(baseline)}) en <b>{soles(exc)}</b>. Revisa los metrados/precios que editaste.</span>
+          </div>
+        ) : null
+      })()}
+
       {/* Barra de acciones */}
       <div className="bg-white border-b border-slate-200 px-6 py-2.5 flex items-center justify-between gap-3 flex-wrap">
-        <p className="text-xs text-slate-500">Click en una actividad para editar fecha, duración y avance. O pídele a la IA que lo arme.</p>
+        <p className="text-xs text-slate-500">Click en una actividad para editar fecha, duración, avance y costo. O pídele a la IA que lo arme.</p>
         <div className="flex items-center gap-2">
           <button onClick={() => setDayW((z) => Math.max(2, z - 2))} className="w-7 h-7 flex items-center justify-center border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-50"><ZoomOut className="w-3.5 h-3.5" /></button>
           <button onClick={() => setDayW((z) => Math.min(20, z + 2))} className="w-7 h-7 flex items-center justify-center border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-50"><ZoomIn className="w-3.5 h-3.5" /></button>
@@ -354,7 +389,10 @@ export default function CronogramaObraPage() {
                             )}
                           </div>
                           {row.atrasada && <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0" />}
-                          <span className={`text-[10px] font-semibold tabular-nums shrink-0 ${row.avance >= 100 ? 'text-emerald-600' : 'text-slate-400'}`}>{row.avance}%</span>
+                          {!!row.costo && (
+                            <span className="text-[10px] tabular-nums shrink-0 text-slate-500 hidden sm:inline" title={`Valor ganado: ${soles(row.valorGanado ?? 0)}`}>{soles(row.costo)}</span>
+                          )}
+                          <span className={`text-[10px] font-semibold tabular-nums shrink-0 w-8 text-right ${row.avance >= 100 ? 'text-emerald-600' : 'text-slate-400'}`}>{row.avance}%</span>
                         </div>
                         {/* Timeline */}
                         <div className="relative shrink-0 py-2" style={{ width: timelineW }}>
@@ -413,9 +451,16 @@ export default function CronogramaObraPage() {
               <label className="block text-xs font-medium text-slate-600 mb-1">Avance: <span className="font-semibold text-slate-800">{editVals.avance}%</span></label>
               <input type="range" min={0} max={100} step={5} className="w-full accent-slate-800" value={editVals.avance} onChange={(e) => setEditVals((v) => ({ ...v, avance: num(e.target.value) }))} />
             </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Responsable</label>
-              <input className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-blue-400" value={editVals.responsable} onChange={(e) => setEditVals((v) => ({ ...v, responsable: e.target.value }))} placeholder="Nombre del responsable" />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Responsable</label>
+                <input className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-blue-400" value={editVals.responsable} onChange={(e) => setEditVals((v) => ({ ...v, responsable: e.target.value }))} placeholder="Nombre del responsable" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Costo presupuestado (S/)</label>
+                <input type="number" className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-blue-400" value={editVals.costo || ''} onChange={(e) => setEditVals((v) => ({ ...v, costo: num(e.target.value) }))} placeholder="0" />
+                {editVals.costo > 0 && <p className="text-[10px] text-slate-400 mt-1">Valor ganado: {soles(editVals.costo * clamp(editVals.avance) / 100)} ({clamp(editVals.avance)}%)</p>}
+              </div>
             </div>
             <div className="flex gap-2 pt-1">
               <button onClick={() => setEdit(null)} className="flex-1 text-sm text-slate-600 border border-slate-200 py-2.5 rounded-xl hover:bg-slate-50">Cancelar</button>
