@@ -34,6 +34,8 @@ export default function EquipoPage() {
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
   const [editar, setEditar] = useState<Miembro | null>(null)
+  const [personal, setPersonal] = useState<any[]>([])
+  const [nuevo, setNuevo] = useState({ nombre: '', dni: '', cargo: '', jornal: '', telefono: '', fase: '' })
 
   const cargar = () => {
     Promise.all([
@@ -44,7 +46,36 @@ export default function EquipoPage() {
       setMiembros(Array.isArray(eq) ? eq : [])
     }).finally(() => setLoading(false))
   }
-  useEffect(() => { setLoading(true); cargar() }, [id])
+  const cargarPersonal = () => {
+    fetch(`${API_BASE}/fases-detalle/${id}/personal_obra`, { headers })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setPersonal(Array.isArray(d?.datos?.lista) ? d.datos.lista : []))
+      .catch(() => {})
+  }
+  useEffect(() => { setLoading(true); cargar(); cargarPersonal() }, [id])
+  useEffect(() => {
+    const h = () => cargarPersonal()
+    window.addEventListener('c4:personal-updated', h)
+    return () => window.removeEventListener('c4:personal-updated', h)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id])
+
+  async function guardarPersonal(lista: any[]) {
+    setPersonal(lista)
+    await fetch(`${API_BASE}/fases-detalle/${id}/personal_obra`, { method: 'PUT', headers, body: JSON.stringify({ datos: { lista } }) }).catch(() => {})
+  }
+  function quitarTrabajador(tid: string) { guardarPersonal(personal.filter((t) => t.id !== tid)) }
+  function agregarTrabajadorManual() {
+    if (!nuevo.nombre.trim()) return
+    const t = {
+      id: Math.random().toString(36).slice(2, 10), nombre: nuevo.nombre.trim(),
+      dni: nuevo.dni.trim() || undefined, cargo: nuevo.cargo.trim() || undefined,
+      jornal: nuevo.jornal ? Number(nuevo.jornal) : undefined, telefono: nuevo.telefono.trim() || undefined,
+      fase: nuevo.fase || undefined,
+    }
+    guardarPersonal([...personal, t])
+    setNuevo({ nombre: '', dni: '', cargo: '', jornal: '', telefono: '', fase: '' })
+  }
 
   async function registrar() {
     setError('')
@@ -167,6 +198,57 @@ export default function EquipoPage() {
                 </div>
               )
             })}
+          </div>
+        )}
+      </div>
+
+      {/* Personal de obra (planilla) */}
+      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+        <div className="px-5 py-3.5 border-b border-slate-100 flex items-center gap-2">
+          <HardHat className="w-4 h-4 text-slate-400" />
+          <h3 className="text-xs font-bold text-slate-600 uppercase tracking-widest">Personal de obra (planilla)</h3>
+          <span className="text-[10px] text-slate-400">{personal.length}</span>
+        </div>
+        <p className="px-5 pt-2.5 text-[11px] text-slate-400 leading-relaxed">
+          Cuadrilla y staff de la obra. La IA los carga desde tu Excel de nómina (o agrégalos abajo). No entran al sistema (no tienen login): sirven para la planilla y para asignarlos como responsables.
+        </p>
+        {personal.length === 0 ? (
+          <p className="text-sm text-slate-400 px-5 py-6 text-center">Sin personal aún. Sube tu nómina al chat y dile <span className="font-medium text-slate-600">"agrega los trabajadores"</span>.</p>
+        ) : (
+          <div className="overflow-x-auto mt-1">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-slate-50 text-[11px] text-slate-500 uppercase tracking-wider">
+                  <th className="text-left font-medium px-4 py-2">Nombre</th>
+                  <th className="text-left font-medium px-2 py-2">DNI</th>
+                  <th className="text-left font-medium px-2 py-2">Cargo</th>
+                  <th className="text-right font-medium px-2 py-2">Jornal (S/)</th>
+                  <th className="text-left font-medium px-2 py-2">Teléfono</th>
+                  {soyJefe && <th className="w-8"></th>}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {personal.map((t) => (
+                  <tr key={t.id} className="hover:bg-slate-50/50">
+                    <td className="px-4 py-2 font-medium text-slate-700">{t.nombre}</td>
+                    <td className="px-2 py-2 text-slate-500 tabular-nums">{t.dni ?? '—'}</td>
+                    <td className="px-2 py-2 text-slate-500">{t.cargo ?? '—'}</td>
+                    <td className="px-2 py-2 text-right text-slate-500 tabular-nums">{t.jornal ? Number(t.jornal).toLocaleString('es-PE') : '—'}</td>
+                    <td className="px-2 py-2 text-slate-500 tabular-nums">{t.telefono ?? '—'}</td>
+                    {soyJefe && <td className="px-1 py-2 text-center"><button onClick={() => quitarTrabajador(t.id)} className="text-slate-300 hover:text-red-400 p-1"><Trash2 className="w-3.5 h-3.5" /></button></td>}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {soyJefe && (
+          <div className="px-4 py-3 border-t border-slate-100 flex flex-wrap items-center gap-2">
+            <input className={`${inputCls} flex-1 min-w-40`} value={nuevo.nombre} onChange={(e) => setNuevo({ ...nuevo, nombre: e.target.value })} placeholder="Nombre completo" />
+            <input className={`${inputCls} w-24`} value={nuevo.dni} onChange={(e) => setNuevo({ ...nuevo, dni: e.target.value })} placeholder="DNI" />
+            <input className={`${inputCls} w-32`} value={nuevo.cargo} onChange={(e) => setNuevo({ ...nuevo, cargo: e.target.value })} placeholder="Cargo" />
+            <input className={`${inputCls} w-24`} value={nuevo.jornal} onChange={(e) => setNuevo({ ...nuevo, jornal: e.target.value })} placeholder="Jornal" />
+            <button onClick={agregarTrabajadorManual} className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-700 text-white text-xs font-medium px-3 py-2 rounded-xl shrink-0"><Plus className="w-3.5 h-3.5" /> Agregar</button>
           </div>
         )}
       </div>

@@ -156,6 +156,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             emit('c4:metrado-updated', {})
           } else if (eventType === 'cronograma_actualizado') {
             emit('c4:cronograma-updated', {})
+          } else if (eventType === 'personal_actualizado') {
+            emit('c4:personal-updated', {})
           } else if (eventType === 'concreto_actualizado') {
             emit('c4:concreto-updated', {})
           } else if (eventType === 'productividad_actualizada') {
