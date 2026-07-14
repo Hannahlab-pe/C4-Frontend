@@ -35,7 +35,7 @@ export default function EquipoPage() {
   const [error, setError] = useState('')
   const [editar, setEditar] = useState<Miembro | null>(null)
   const [personal, setPersonal] = useState<any[]>([])
-  const [nuevo, setNuevo] = useState({ nombre: '', dni: '', cargo: '', jornal: '', telefono: '', fase: '' })
+  const [nuevo, setNuevo] = useState({ nombre: '', dni: '', cargo: '', cuadrilla: '', equipo: '', jornal: '', telefono: '', fase: '' })
 
   const cargar = () => {
     Promise.all([
@@ -70,11 +70,12 @@ export default function EquipoPage() {
     const t = {
       id: Math.random().toString(36).slice(2, 10), nombre: nuevo.nombre.trim(),
       dni: nuevo.dni.trim() || undefined, cargo: nuevo.cargo.trim() || undefined,
+      cuadrilla: nuevo.cuadrilla.trim() || undefined, equipo: nuevo.equipo.trim() || undefined,
       jornal: nuevo.jornal ? Number(nuevo.jornal) : undefined, telefono: nuevo.telefono.trim() || undefined,
       fase: nuevo.fase || undefined,
     }
     guardarPersonal([...personal, t])
-    setNuevo({ nombre: '', dni: '', cargo: '', jornal: '', telefono: '', fase: '' })
+    setNuevo({ nombre: '', dni: '', cargo: '', cuadrilla: '', equipo: '', jornal: '', telefono: '', fase: '' })
   }
 
   async function registrar() {
@@ -222,6 +223,8 @@ export default function EquipoPage() {
                   <th className="text-left font-medium px-4 py-2">Nombre</th>
                   <th className="text-left font-medium px-2 py-2">DNI</th>
                   <th className="text-left font-medium px-2 py-2">Cargo</th>
+                  <th className="text-left font-medium px-2 py-2">Cuadrilla</th>
+                  <th className="text-left font-medium px-2 py-2">Equipo que opera</th>
                   <th className="text-right font-medium px-2 py-2">Jornal (S/)</th>
                   <th className="text-left font-medium px-2 py-2">Teléfono</th>
                   {soyJefe && <th className="w-8"></th>}
@@ -233,6 +236,8 @@ export default function EquipoPage() {
                     <td className="px-4 py-2 font-medium text-slate-700">{t.nombre}</td>
                     <td className="px-2 py-2 text-slate-500 tabular-nums">{t.dni ?? '—'}</td>
                     <td className="px-2 py-2 text-slate-500">{t.cargo ?? '—'}</td>
+                    <td className="px-2 py-2 text-slate-500">{t.cuadrilla ?? '—'}</td>
+                    <td className="px-2 py-2 text-slate-500">{t.equipo ?? '—'}</td>
                     <td className="px-2 py-2 text-right text-slate-500 tabular-nums">{t.jornal ? Number(t.jornal).toLocaleString('es-PE') : '—'}</td>
                     <td className="px-2 py-2 text-slate-500 tabular-nums">{t.telefono ?? '—'}</td>
                     {soyJefe && <td className="px-1 py-2 text-center"><button onClick={() => quitarTrabajador(t.id)} className="text-slate-300 hover:text-red-400 p-1"><Trash2 className="w-3.5 h-3.5" /></button></td>}
@@ -247,6 +252,7 @@ export default function EquipoPage() {
             <input className={`${inputCls} flex-1 min-w-40`} value={nuevo.nombre} onChange={(e) => setNuevo({ ...nuevo, nombre: e.target.value })} placeholder="Nombre completo" />
             <input className={`${inputCls} w-24`} value={nuevo.dni} onChange={(e) => setNuevo({ ...nuevo, dni: e.target.value })} placeholder="DNI" />
             <input className={`${inputCls} w-32`} value={nuevo.cargo} onChange={(e) => setNuevo({ ...nuevo, cargo: e.target.value })} placeholder="Cargo" />
+            <input className={`${inputCls} w-40`} value={nuevo.cuadrilla} onChange={(e) => setNuevo({ ...nuevo, cuadrilla: e.target.value })} placeholder="Cuadrilla" />
             <input className={`${inputCls} w-24`} value={nuevo.jornal} onChange={(e) => setNuevo({ ...nuevo, jornal: e.target.value })} placeholder="Jornal" />
             <button onClick={agregarTrabajadorManual} className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-700 text-white text-xs font-medium px-3 py-2 rounded-xl shrink-0"><Plus className="w-3.5 h-3.5" /> Agregar</button>
           </div>
