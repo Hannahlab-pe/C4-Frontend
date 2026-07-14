@@ -21,6 +21,7 @@ import ControlConcretoFase from '../components/ControlConcretoFase'
 import CicloPisoFase from '../components/CicloPisoFase'
 import ProductividadFase from '../components/ProductividadFase'
 import MetradoFase from '../components/MetradoFase'
+import PresupuestoFase from '../components/PresupuestoFase'
 import CalidadFase from '../components/CalidadFase'
 import {
   ESQUEMAS_REGISTRO, kpisDeRegistros, estadoRegistroClase,
@@ -679,6 +680,7 @@ export default function ProyectoFasePage() {
     ...(fase !== 'administracion' ? [{ key: 'calidad', label: 'Calidad', icon: BadgeCheck }] : []),
     ...(fase === 'excavacion' ? [{ key: 'suelos', label: 'Estudio de Suelos', icon: Mountain }, { key: 'calzaduras', label: 'Calzaduras', icon: Layers }, { key: 'tierras', label: 'Mov. de tierras', icon: Truck }, { key: 'metrado', label: 'Metrado y costo', icon: ClipboardList }, { key: 'monitoreo', label: 'Monitoreo', icon: Activity }] : []),
     ...(fase === 'construccion' ? [{ key: 'concreto', label: 'Control de concreto', icon: TestTube2 }, { key: 'ciclo', label: 'Ciclo de piso', icon: Building2 }] : []),
+    ...(['construccion', 'acabados', 'administracion'].includes(fase ?? '') ? [{ key: 'partidas', label: 'Metrado y costo', icon: ClipboardList }] : []),
     ...(['demolicion', 'excavacion', 'construccion', 'acabados'].includes(fase ?? '') ? [{ key: 'productividad', label: 'Productividad', icon: Gauge }] : []),
     ...((fase === 'demolicion' || fase === 'excavacion') ? [{ key: 'colindantes', label: 'Colindantes', icon: Users }] : []),
     { key: 'documentos',  label: 'Documentos',     icon: FolderCheck, badge: docsReq.length },
@@ -1072,6 +1074,7 @@ export default function ProyectoFasePage() {
 
         {/* ════ TAB: METRADO Y COSTO (excavación) ════ */}
         {tab === 'metrado' && <MetradoFase proyectoId={proyectoId!} />}
+        {tab === 'partidas' && <PresupuestoFase proyectoId={proyectoId!} fase={fase!} />}
 
         {/* ════ TAB: MONITOREO DE ASENTAMIENTOS (excavación) ════ */}
         {tab === 'monitoreo' && <MonitoreoFase proyectoId={proyectoId!} />}
