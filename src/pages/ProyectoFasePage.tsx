@@ -45,7 +45,8 @@ interface Equipo {
 }
 
 interface Contrata {
-  id: string; empresa: string; tipo: string; servicios: string[]; equipos: string[]
+  id: string; empresa: string; ruc: string; tipo: string; servicios: string[]; equipos: string[]
+  costoUnitario: number; unidad: string
   presupuestoTotal: number; presupuestoAsignado: number
   contactoNombre: string; contactoTelefono: string
   estado: string; cobertura: string; notas: string
@@ -1195,7 +1196,7 @@ export default function ProyectoFasePage() {
                   <p className="text-xs text-slate-400 mt-0.5">Empresas contratadas para esta fase</p>
                 </div>
                 <button
-                  onClick={() => setModalContrata({ tipo: 'subcontrato_obra', estado: 'activo', cobertura: 'parcial', servicios: [], equipos: [], presupuestoTotal: 0, presupuestoAsignado: 0, contactoNombre: '', contactoTelefono: '', notas: '' })}
+                  onClick={() => setModalContrata({ tipo: 'subcontrato_obra', estado: 'activo', cobertura: 'parcial', servicios: [], equipos: [], ruc: '', costoUnitario: 0, unidad: 'm2', presupuestoTotal: 0, presupuestoAsignado: 0, contactoNombre: '', contactoTelefono: '', notas: '' })}
                   className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-700 text-white text-xs font-medium px-4 py-2 rounded-xl transition-colors"
                 >
                   <Plus className="w-3.5 h-3.5" />Nueva Contrata
@@ -1599,6 +1600,24 @@ export default function ProyectoFasePage() {
             <Field label="Empresa">
               <input className={inputCls} value={modalContrata.empresa ?? ''} onChange={(e) => setModalContrata((p) => ({ ...p!, empresa: e.target.value }))} placeholder="Ej: Constructora Los Andes SAC" />
             </Field>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <Field label="RUC">
+                <input className={inputCls} value={modalContrata.ruc ?? ''} onChange={(e) => setModalContrata((p) => ({ ...p!, ruc: e.target.value }))} placeholder="20123456789" />
+              </Field>
+              <Field label="Costo unitario (S/)">
+                <input type="number" className={inputCls} value={modalContrata.costoUnitario ?? 0} onChange={(e) => setModalContrata((p) => ({ ...p!, costoUnitario: Number(e.target.value) }))} placeholder="0" />
+              </Field>
+              <Field label="Unidad del costo">
+                <select className={inputCls} value={modalContrata.unidad ?? 'm2'} onChange={(e) => setModalContrata((p) => ({ ...p!, unidad: e.target.value }))}>
+                  <option value="m2">por m² (encofrado, muro…)</option>
+                  <option value="ml">por ml (metro lineal)</option>
+                  <option value="kg">por kg (acero)</option>
+                  <option value="m3">por m³ (cubo, concreto)</option>
+                  <option value="glb">global (glb)</option>
+                  <option value="und">por unidad (und)</option>
+                </select>
+              </Field>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="Tipo de servicio">
                 <select className={inputCls} value={modalContrata.tipo ?? 'otro'} onChange={(e) => setModalContrata((p) => ({ ...p!, tipo: e.target.value }))}>
