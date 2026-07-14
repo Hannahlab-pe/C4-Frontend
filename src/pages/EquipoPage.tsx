@@ -114,7 +114,7 @@ export default function EquipoPage() {
   )
 
   return (
-    <div className="h-full overflow-y-auto p-4 md:p-6 max-w-4xl space-y-5">
+    <div className="h-full overflow-y-auto p-4 md:p-6 max-w-6xl space-y-5">
       <div>
         <h2 className="text-lg font-bold text-slate-800">Equipo del proyecto</h2>
         <p className="text-xs text-slate-400 mt-0.5">
@@ -233,11 +233,11 @@ export default function EquipoPage() {
               <tbody className="divide-y divide-slate-50">
                 {personal.map((t) => (
                   <tr key={t.id} className="hover:bg-slate-50/50">
-                    <td className="px-4 py-2 font-medium text-slate-700">{t.nombre}</td>
+                    <td className="px-4 py-2 font-medium text-slate-700 whitespace-nowrap">{t.nombre}</td>
                     <td className="px-2 py-2 text-slate-500 tabular-nums">{t.dni ?? '—'}</td>
-                    <td className="px-2 py-2 text-slate-500">{t.cargo ?? '—'}</td>
-                    <td className="px-2 py-2 text-slate-500">{t.cuadrilla ?? '—'}</td>
-                    <td className="px-2 py-2 text-slate-500">{t.equipo ?? '—'}</td>
+                    <td className="px-2 py-2 text-slate-500 whitespace-nowrap">{t.cargo ?? '—'}</td>
+                    <td className="px-2 py-2 text-slate-500 whitespace-nowrap">{t.cuadrilla ?? '—'}</td>
+                    <td className="px-2 py-2 text-slate-500 whitespace-nowrap">{t.equipo ?? '—'}</td>
                     <td className="px-2 py-2 text-right text-slate-500 tabular-nums">{t.jornal ? Number(t.jornal).toLocaleString('es-PE') : '—'}</td>
                     <td className="px-2 py-2 text-slate-500 tabular-nums">{t.telefono ?? '—'}</td>
                     {soyJefe && <td className="px-1 py-2 text-center"><button onClick={() => quitarTrabajador(t.id)} className="text-slate-300 hover:text-red-400 p-1"><Trash2 className="w-3.5 h-3.5" /></button></td>}
