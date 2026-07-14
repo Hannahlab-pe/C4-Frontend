@@ -18,16 +18,6 @@ interface Proyecto {
 
 interface Stats { pisos?: number; deptos?: number; tir?: number; areaVend?: number }
 
-// Acentos de color por card (en vez de fotos que se repiten)
-const ACCENTS = [
-  'from-blue-500 to-blue-700',
-  'from-indigo-500 to-indigo-700',
-  'from-sky-500 to-cyan-600',
-  'from-violet-500 to-purple-700',
-  'from-cyan-500 to-blue-600',
-  'from-slate-600 to-slate-800',
-]
-
 function iniciales(nombre: string): string {
   const palabras = nombre.trim().split(/\s+/).filter(Boolean)
   if (palabras.length === 0) return '?'
@@ -135,84 +125,68 @@ export default function ProyectosPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtrados.map((p, i) => {
+          {filtrados.map((p) => {
             const s = stats[p.id] ?? {}
             const tieneAnalisis = s.pisos != null || s.tir != null
             const estado = (p.estado ?? 'activo').toLowerCase()
             const estadoCfg = estado === 'completado'
-              ? { txt: 'Completado', cls: 'bg-emerald-50 text-emerald-600 border-emerald-200' }
+              ? { txt: 'Completado', dot: 'bg-emerald-500' }
               : estado === 'borrador'
-              ? { txt: 'Borrador', cls: 'bg-slate-100 text-slate-500 border-slate-200' }
-              : { txt: 'Activo', cls: 'bg-blue-50 text-blue-600 border-blue-200' }
+              ? { txt: 'Borrador', dot: 'bg-slate-300' }
+              : { txt: 'Activo', dot: 'bg-blue-500' }
+            const kpis = [
+              { Icon: Building2, label: 'Pisos', val: s.pisos ?? '—', cls: 'text-slate-900' },
+              { Icon: Layers, label: 'Deptos', val: s.deptos ?? '—', cls: 'text-slate-900' },
+              { Icon: TrendingUp, label: 'TIR', val: s.tir != null ? `${s.tir.toFixed(0)}%` : '—', cls: (s.tir ?? 0) >= 18 ? 'text-emerald-600' : (s.tir ?? 0) >= 12 ? 'text-amber-600' : 'text-slate-900' },
+            ]
             return (
               <button
                 key={p.id}
                 onClick={() => navigate(`/proyectos/${p.id}/panel`)}
-                className="relative flex flex-col text-left bg-white rounded-2xl border border-slate-200 p-5
-                  hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-200/70 hover:border-blue-200
-                  transition-all duration-300 group"
+                className="group relative flex flex-col text-left bg-white rounded-2xl border border-slate-200/80 p-5
+                  hover:-translate-y-0.5 hover:shadow-lg hover:shadow-slate-200/60 hover:border-slate-300
+                  transition-all duration-200"
               >
                 {/* Top: avatar + estado */}
-                <div className="flex items-start justify-between mb-3">
-                  <div className={`w-12 h-12 rounded-xl bg-linear-to-br ${ACCENTS[i % ACCENTS.length]}
-                    flex items-center justify-center shadow-lg shadow-slate-200`}>
-                    <span className="text-white font-bold text-sm tracking-tight">{iniciales(p.nombre)}</span>
+                <div className="flex items-start justify-between mb-4">
+                  <div className="w-11 h-11 rounded-xl bg-slate-900 flex items-center justify-center ring-1 ring-inset ring-white/10">
+                    <span className="text-white font-semibold text-sm tracking-tight">{iniciales(p.nombre)}</span>
                   </div>
-                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${estadoCfg.cls}`}>
+                  <span className="flex items-center gap-1.5 text-[10px] font-medium text-slate-400 uppercase tracking-wide mt-1">
+                    <span className={`w-1.5 h-1.5 rounded-full ${estadoCfg.dot}`} />
                     {estadoCfg.txt}
                   </span>
                 </div>
 
                 {/* Nombre + meta */}
-                <p className="text-base font-bold text-slate-800 leading-tight truncate">{p.nombre}</p>
-                <div className="flex items-center gap-3 mt-1.5">
-                  <span className="text-[11px] text-slate-500 flex items-center gap-1">
-                    <MapPin className="w-3 h-3 text-slate-400" /> {p.distrito || 'Sin distrito'}
-                  </span>
-                  {p.createdAt && (
-                    <span className="text-[11px] text-slate-400 flex items-center gap-1">
-                      <CalendarDays className="w-3 h-3" /> {fmtFecha(p.createdAt)}
-                    </span>
-                  )}
+                <p className="text-[15px] font-semibold text-slate-900 leading-snug truncate">{p.nombre}</p>
+                <div className="flex items-center gap-3 mt-1.5 text-[11px] text-slate-400">
+                  <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {p.distrito || 'Sin distrito'}</span>
+                  {p.createdAt && <span className="flex items-center gap-1"><CalendarDays className="w-3 h-3" /> {fmtFecha(p.createdAt)}</span>}
                 </div>
 
-                {/* Divisor */}
-                <div className="border-t border-slate-100 my-3.5" />
+                <div className="border-t border-slate-100 my-4" />
 
                 {/* Stats del análisis */}
                 {tieneAnalisis ? (
                   <div className="grid grid-cols-3 gap-2">
-                    <div>
-                      <div className="flex items-center gap-1 text-[10px] text-slate-400 mb-0.5">
-                        <Building2 className="w-3 h-3" /> Pisos
+                    {kpis.map((k) => (
+                      <div key={k.label}>
+                        <div className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-slate-400 mb-0.5"><k.Icon className="w-3 h-3" /> {k.label}</div>
+                        <p className={`text-sm font-bold ${k.cls}`}>{k.val}</p>
                       </div>
-                      <p className="text-sm font-bold text-slate-700">{s.pisos ?? '-'}</p>
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-1 text-[10px] text-slate-400 mb-0.5">
-                        <Layers className="w-3 h-3" /> Deptos
-                      </div>
-                      <p className="text-sm font-bold text-slate-700">{s.deptos ?? '-'}</p>
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-1 text-[10px] text-slate-400 mb-0.5">
-                        <TrendingUp className="w-3 h-3" /> TIR
-                      </div>
-                      <p className={`text-sm font-bold ${(s.tir ?? 0) >= 18 ? 'text-emerald-600' : (s.tir ?? 0) >= 12 ? 'text-amber-600' : 'text-slate-700'}`}>
-                        {s.tir != null ? `${s.tir.toFixed(0)}%` : '-'}
-                      </p>
-                    </div>
+                    ))}
                   </div>
                 ) : (
                   <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
-                    <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+                    <Sparkles className="w-3.5 h-3.5 text-slate-400" />
                     Análisis pendiente — genéralo con el Asistente C4
                   </div>
                 )}
 
                 {/* Flecha hover */}
                 <ChevronRight className="absolute bottom-5 right-5 w-4 h-4 text-slate-300
-                  opacity-100 sm:opacity-0 sm:group-hover:opacity-100 group-hover:text-blue-500 translate-x-1 group-hover:translate-x-0 transition-all duration-200" />
+                  opacity-0 group-hover:opacity-100 group-hover:text-slate-600 translate-x-1 group-hover:translate-x-0 transition-all duration-200" />
               </button>
             )
           })}
@@ -220,10 +194,10 @@ export default function ProyectosPage() {
           {/* Card fantasma: nuevo proyecto */}
           <button
             onClick={() => setShowModal(true)}
-            className="rounded-2xl min-h-52 border-2 border-dashed border-slate-300 hover:border-blue-400
-              hover:bg-blue-50/40 transition-all duration-200 flex flex-col items-center justify-center gap-2.5 group"
+            className="rounded-2xl min-h-52 border border-dashed border-slate-300 hover:border-slate-400
+              hover:bg-slate-50 transition-all duration-200 flex flex-col items-center justify-center gap-2.5 group"
           >
-            <div className="w-12 h-12 rounded-2xl bg-blue-600 group-hover:scale-110 transition-transform duration-200 flex items-center justify-center shadow-lg shadow-blue-600/30">
+            <div className="w-11 h-11 rounded-xl bg-slate-900 group-hover:scale-105 transition-transform duration-200 flex items-center justify-center">
               <Plus className="w-5 h-5 text-white" />
             </div>
             <p className="text-sm font-semibold text-slate-600">Nuevo proyecto</p>

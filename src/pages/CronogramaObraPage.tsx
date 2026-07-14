@@ -77,6 +77,7 @@ export default function CronogramaObraPage() {
   const [incidInput, setIncidInput] = useState('')
   const [guardandoEdit, setGuardandoEdit] = useState(false)
   const [cfg, setCfg] = useState<any>({})
+  const [personal, setPersonal] = useState<{ id?: string; nombre: string; cargo?: string; cuadrilla?: string }[]>([])
 
   const cargar = useCallback(() => {
     if (!proyectoId) return
@@ -112,6 +113,16 @@ export default function CronogramaObraPage() {
   }, [cargar])
 
   const hoy = useMemo(() => { const d = new Date(); d.setHours(12, 0, 0, 0); return d }, [])
+
+  // Planilla de personal → para el selector de "Encargado" en el panel de partida
+  useEffect(() => {
+    if (!proyectoId) return
+    const cargarP = () => fetch(`${API_BASE}/fases-detalle/${proyectoId}/personal_obra`, { headers })
+      .then((r) => (r.ok ? r.json() : null)).then((d) => setPersonal(Array.isArray(d?.datos?.lista) ? d.datos.lista : [])).catch(() => {})
+    cargarP()
+    window.addEventListener('c4:personal-updated', cargarP)
+    return () => window.removeEventListener('c4:personal-updated', cargarP)
+  }, [proyectoId, headers])
 
   // ── Árbol de filas (fase → etapa → actividad) con fechas — se usa para KPIs y rango ──
   const { minD, maxD, kpis } = useMemo(() => {
@@ -453,10 +464,16 @@ export default function CronogramaObraPage() {
               </div>
             </section>
 
-            {/* Encargado */}
+            {/* Encargado — selector de la planilla de personal */}
             <section>
               <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5"><User className="w-3.5 h-3.5" /> Encargado</label>
-              <input className={inputCls} value={editVals.responsable} onChange={(e) => setEditVals((v) => ({ ...v, responsable: e.target.value }))} placeholder="Nombre del responsable / cuadrilla" />
+              <select className={inputCls} value={editVals.responsable} onChange={(e) => setEditVals((v) => ({ ...v, responsable: e.target.value }))}>
+                <option value="">— Sin asignar —</option>
+                {editVals.responsable && !personal.some((p) => p.nombre === editVals.responsable) && <option value={editVals.responsable}>{editVals.responsable}</option>}
+                {personal.map((p) => <option key={p.id || p.nombre} value={p.nombre}>{p.nombre}{p.cargo ? ` · ${p.cargo}` : ''}{p.cuadrilla ? ` · ${p.cuadrilla}` : ''}</option>)}
+              </select>
+              {d.cuadrilla && <p className="text-[11px] text-slate-400 mt-1">Cuadrilla de la partida: <b className="text-slate-500">{d.cuadrilla}</b></p>}
+              {personal.length === 0 && <p className="text-[11px] text-slate-400 mt-1">No hay personal en la planilla todavía — cárgalo en Equipo → Personal de obra.</p>}
             </section>
 
             {/* Presupuesto vs real */}
