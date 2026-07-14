@@ -34,6 +34,7 @@ export default function ProyectoPanelLayout() {
   const setChatOpen = useChatStore((s) => s.setOpen)
   const chatWidth = useChatStore((s) => s.width)
   const setChatWidth = useChatStore((s) => s.setWidth)
+  const chatExpanded = useChatStore((s) => s.expanded)
   const dragging = useRef(false)
   const startX = useRef(0)
   const startWidth = useRef(DEFAULT_WIDTH)
@@ -206,7 +207,7 @@ export default function ProyectoPanelLayout() {
               (chatOpen ? 'fixed inset-0 z-50 flex chat-mobile-in' : 'hidden') +
               ' md:static md:inset-auto md:z-auto md:flex md:shrink-0 md:w-(--chat-w) md:transition-[width] md:duration-300 md:ease-in-out'
             }
-            style={{ ['--chat-w' as any]: (chatOpen ? chatWidth : 0) + 'px' }}
+            style={{ ['--chat-w' as any]: chatOpen ? (chatExpanded ? 'min(880px, 62vw)' : chatWidth + 'px') : '0px' }}
           >
             {/* Drag handle — solo desktop */}
             {chatOpen && (

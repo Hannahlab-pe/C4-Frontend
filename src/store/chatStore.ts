@@ -24,6 +24,7 @@ function emit(name: string, detail?: any) {
 interface ChatStore {
   open: boolean
   width: number
+  expanded: boolean
   proyectoId: string | null
   mensajes: ChatMensaje[]
   sending: boolean
@@ -31,6 +32,7 @@ interface ChatStore {
   setOpen: (v: boolean) => void
   toggle: () => void
   setWidth: (n: number) => void
+  toggleExpanded: () => void
   cargarSesion: (proyectoId: string) => Promise<void>
   enviar: (texto: string, archivo?: { nombre: string; tipo: string; base64: string }, faseActual?: string) => Promise<void>
 }
@@ -38,6 +40,7 @@ interface ChatStore {
 export const useChatStore = create<ChatStore>((set, get) => ({
   open: false,
   width: 400,
+  expanded: false,
   proyectoId: null,
   mensajes: [SALUDO],
   sending: false,
@@ -46,6 +49,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   setOpen: (v) => set({ open: v }),
   toggle: () => set((s) => ({ open: !s.open })),
   setWidth: (n) => set({ width: n }),
+  toggleExpanded: () => set((s) => ({ expanded: !s.expanded })),
 
   // Carga el historial solo al cambiar de proyecto. Si es el mismo proyecto,
   // NO reinicia (preserva un stream en curso al navegar entre módulos).

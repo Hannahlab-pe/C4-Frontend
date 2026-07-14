@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useLocation } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import {
   Send, Mic, Paperclip, Sparkles, Loader2,
-  CheckCircle2, Download, FileText, X, Plus, Trash2, Map, Volume2, VolumeX,
+  CheckCircle2, Download, FileText, X, Plus, Trash2, Map, Volume2, VolumeX, Maximize2, Minimize2,
 } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 import { useChatStore } from '../store/chatStore'
@@ -25,6 +26,8 @@ export default function ChatPanel({ proyectoId }: Props) {
   const cargarSesion = useChatStore((s) => s.cargarSesion)
   const enviar = useChatStore((s) => s.enviar)
   const setOpen = useChatStore((s) => s.setOpen)
+  const expanded = useChatStore((s) => s.expanded)
+  const toggleExpanded = useChatStore((s) => s.toggleExpanded)
 
   const [input, setInput] = useState('')
   const [archivo, setArchivo] = useState<{ nombre: string; tipo: string; base64: string } | null>(null)
@@ -214,6 +217,13 @@ export default function ChatPanel({ proyectoId }: Props) {
             {vozActiva ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
           </button>
           <button
+            onClick={toggleExpanded}
+            title={expanded ? 'Reducir el chat' : 'Ampliar el chat (ver la respuesta completa)'}
+            className="hidden md:flex w-7 h-7 rounded-lg hover:bg-slate-100 items-center justify-center text-slate-400 hover:text-slate-600 transition-colors"
+          >
+            {expanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+          </button>
+          <button
             onClick={() => setOpen(false)}
             className="w-7 h-7 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors"
           >
@@ -330,6 +340,7 @@ export default function ChatPanel({ proyectoId }: Props) {
                 </div>
               ) : msg.contenido ? (
                 <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
                   components={{
                     h2: ({ children }) => <p className="font-bold text-slate-800 text-sm mb-1.5 mt-1">{children}</p>,
                     h3: ({ children }) => <p className="font-semibold text-slate-700 text-xs uppercase tracking-wide mb-1 mt-2.5 first:mt-0">{children}</p>,
@@ -339,6 +350,11 @@ export default function ChatPanel({ proyectoId }: Props) {
                     li: ({ children }) => <li className="flex gap-1.5"><span className="text-slate-400 shrink-0">·</span><span>{children}</span></li>,
                     blockquote: ({ children }) => <blockquote className="border-l-2 border-slate-200 pl-3 text-slate-400 italic text-xs mt-2">{children}</blockquote>,
                     hr: () => <hr className="border-slate-100 my-2" />,
+                    table: ({ children }) => <div className="overflow-x-auto my-2 rounded-lg border border-slate-200"><table className="w-full text-xs border-collapse">{children}</table></div>,
+                    thead: ({ children }) => <thead className="bg-slate-50">{children}</thead>,
+                    th: ({ children }) => <th className="border-b border-slate-200 px-2.5 py-1.5 text-left font-semibold text-slate-600 whitespace-nowrap">{children}</th>,
+                    td: ({ children }) => <td className="border-b border-slate-100 px-2.5 py-1.5 text-slate-600 align-top">{children}</td>,
+                    code: ({ children }) => <code className="bg-slate-100 text-slate-700 px-1 py-0.5 rounded text-[11px]">{children}</code>,
                   }}
                 >
                   {msg.contenido}
