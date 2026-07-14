@@ -1,27 +1,20 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import {
-  CalendarRange, Loader2, ChevronRight, ChevronDown, CalendarClock,
-  AlertTriangle, Flag, Sparkles, ZoomIn, ZoomOut, User, X, Ruler, Wallet, ClipboardList,
+  CalendarRange, Loader2, CalendarClock,
+  AlertTriangle, Sparkles, User, X, Ruler, Wallet, ClipboardList,
 } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 import { API_BASE } from '../lib/config'
 import { setGuardado } from '../store/guardadoStore'
 import AppDialog from '../components/AppDialog'
+import GanttSVAR, { type SvarTask, type Vista } from '../components/GanttSVAR'
 import {
   ESQUEMAS_REGISTRO, FASES_CONFIG_MIN, agruparPorEtapa, avanceEtapa, avanceFase,
   type RegistroFase, type EtapaFase,
 } from '../lib/registros-fase'
 
 const FASES = ['demolicion', 'excavacion', 'construccion', 'acabados', 'administracion'] as const
-
-const FASE_COLOR: Record<string, { bar: string; soft: string; text: string }> = {
-  demolicion:     { bar: 'bg-rose-500',    soft: 'bg-rose-100',    text: 'text-rose-700' },
-  excavacion:     { bar: 'bg-orange-500',  soft: 'bg-orange-100',  text: 'text-orange-700' },
-  construccion:   { bar: 'bg-blue-500',    soft: 'bg-blue-100',    text: 'text-blue-700' },
-  acabados:       { bar: 'bg-violet-500',  soft: 'bg-violet-100',  text: 'text-violet-700' },
-  administracion: { bar: 'bg-emerald-500', soft: 'bg-emerald-100', text: 'text-emerald-700' },
-}
 
 // ── Helpers de fecha (date-only, sin sustos de zona horaria) ──
 const DIA_MS = 86400000
@@ -35,8 +28,6 @@ const diffDays = (a: Date, b: Date) => Math.round((b.getTime() - a.getTime()) / 
 const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)))
 const toInput = (d: Date) => d.toISOString().slice(0, 10)
 const fmtCorto = (d: Date) => d.toLocaleDateString('es-PE', { day: '2-digit', month: 'short' })
-const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
-const fmtMes = (d: Date) => `${MESES[d.getMonth()]} ${d.getFullYear()}`
 
 const num = (v: any) => { const n = Number(v); return Number.isFinite(n) ? n : 0 }
 
@@ -70,9 +61,6 @@ interface Row {
 const soles = (n: number) => `S/ ${Math.round(n).toLocaleString('es-PE')}`
 const inputCls = 'w-full text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-blue-400'
 const FASE_LABEL: Record<string, string> = { demolicion: 'Demolición', excavacion: 'Excavación', construccion: 'Construcción', acabados: 'Acabados', administracion: 'Administración' }
-// Vistas del Gantt: ancho de píxel por día para ver la obra en detalle (día), estándar (semana) o panorámica (mes)
-const VISTA_W = { dia: 22, semana: 11, mes: 5 } as const
-type Vista = keyof typeof VISTA_W
 
 export default function CronogramaObraPage() {
   const { id: proyectoId } = useParams<{ id: string }>()
@@ -82,8 +70,7 @@ export default function CronogramaObraPage() {
   const [etapasPorFase, setEtapasPorFase] = useState<Record<string, EtapaFase[]>>({})
   const [regsPorFase, setRegsPorFase] = useState<Record<string, RegistroFase[]>>({})
   const [loading, setLoading] = useState(true)
-  const [colapsados, setColapsados] = useState<Set<string>>(new Set())
-  const [dayW, setDayW] = useState(11)
+  const [vista, setVista] = useState<Vista>('semana')
   const [edit, setEdit] = useState<Row | null>(null)
   const [editVals, setEditVals] = useState<{ fechaInicio: string; duracionDias: number; avance: number; responsable: string; costo: number; costoReal: number }>({ fechaInicio: '', duracionDias: 1, avance: 0, responsable: '', costo: 0, costoReal: 0 })
   const [incidencias, setIncidencias] = useState<{ id: string; fecha: string; texto: string }[]>([])
@@ -126,8 +113,8 @@ export default function CronogramaObraPage() {
 
   const hoy = useMemo(() => { const d = new Date(); d.setHours(12, 0, 0, 0); return d }, [])
 
-  // ── Construir el árbol de filas (fase → etapa → actividad) con fechas ──
-  const { rows, minD, maxD, kpis } = useMemo(() => {
+  // ── Árbol de filas (fase → etapa → actividad) con fechas — se usa para KPIs y rango ──
+  const { minD, maxD, kpis } = useMemo(() => {
     const all: Row[] = []
     let minD: Date | null = null, maxD: Date | null = null
     const push = (d: Date | null, es: 'min' | 'max') => {
@@ -155,7 +142,6 @@ export default function CronogramaObraPage() {
         inicio: faseIni, fin: faseFin, avance: avanceFase(fase, etapas, regs),
         atrasada: false, hito: false,
       })
-      if (colapsados.has(faseId)) continue
 
       const grupos = etapas.length ? agruparPorEtapa(etapas, regs) : { '': regs }
       const listaEtapas: { key: string; nombre: string }[] = etapas.length
@@ -175,7 +161,6 @@ export default function CronogramaObraPage() {
           inicio: etIni, fin: etFin, avance: et.key ? avanceEtapa(fase, etapas, et.key, regs) : avanceFase(fase, etapas, regs),
           atrasada: false, hito: false, groupId: faseId,
         })
-        if (colapsados.has(etId)) continue
 
         for (const r of propios) {
           const ini = parseISO(r.datos?.fechaInicio)
@@ -217,70 +202,66 @@ export default function CronogramaObraPage() {
     const avanceCosto = presupuesto ? Math.round(valorGanado / presupuesto * 100) : 0
 
     return { rows: all, minD, maxD, kpis: { atrasadas, avanceGlobal, duracion, inicio: minD, fin: maxD, nActs: acts.length, presupuesto, valorGanado, avanceCosto } }
-  }, [regsPorFase, etapasPorFase, colapsados, hoy])
+  }, [regsPorFase, etapasPorFase, hoy])
 
-  const totalDays = minD && maxD ? diffDays(minD, maxD) : 0
-  const timelineW = Math.max(600, totalDays * dayW)
-  const xDe = (d: Date) => (minD ? diffDays(minD, d) * dayW : 0)
-
-  // columnas de meses para el header
-  const meses = useMemo(() => {
-    if (!minD || !maxD) return [] as { label: string; left: number; width: number }[]
-    const out: { label: string; left: number; width: number }[] = []
-    let cur = new Date(minD.getFullYear(), minD.getMonth(), 1, 12)
-    while (cur < maxD) {
-      const next = new Date(cur.getFullYear(), cur.getMonth() + 1, 1, 12)
-      const ini = cur < minD ? minD : cur
-      const fin = next > maxD ? maxD : next
-      out.push({ label: fmtMes(cur), left: xDe(ini), width: Math.max(0, diffDays(ini, fin) * dayW) })
-      cur = next
+  // ── Tareas para el Gantt SVAR (fase/etapa = resumen, actividad = tarea) con costo rollup ──
+  const svarTasks = useMemo<SvarTask[]>(() => {
+    const out: SvarTask[] = []
+    const costAcum: Record<string, number> = {}
+    for (const fase of FASES) {
+      const regs = regsPorFase[fase] ?? []
+      const etapas = etapasPorFase[fase] ?? []
+      const conFecha = regs.filter((r) => parseISO(r.datos?.fechaInicio))
+      if (!conFecha.length) continue
+      const faseId = `fase:${fase}`
+      out.push({ id: faseId, text: FASES_CONFIG_MIN[fase]?.nombre ?? fase, type: 'summary', open: true, fase })
+      const grupos = etapas.length ? agruparPorEtapa(etapas, regs) : { '': regs }
+      const listaEtapas = etapas.length ? etapas.map((e) => ({ key: e.key, nombre: e.nombre })) : [{ key: '', nombre: 'Actividades' }]
+      for (const et of listaEtapas) {
+        const propios = (grupos[et.key] ?? []).filter((r) => parseISO(r.datos?.fechaInicio))
+        if (!propios.length) continue
+        const etId = `etapa:${fase}:${et.key}`
+        out.push({ id: etId, text: et.nombre, type: 'summary', parent: faseId, open: true, fase })
+        for (const r of propios) {
+          const ini = parseISO(r.datos?.fechaInicio)!
+          const dur = Math.max(1, num(r.datos?.duracionDias))
+          const fin = addDays(ini, dur)
+          const av = Math.round(avanceReg(fase, r))
+          const costo = num(r.datos?.costoPresupuestado) || (num(r.datos?.cantidad) * num(r.datos?.precioUnitario)) || 0
+          costAcum[etId] = (costAcum[etId] ?? 0) + costo
+          costAcum[faseId] = (costAcum[faseId] ?? 0) + costo
+          out.push({
+            id: `reg:${r.id}`, text: r.nombre || 'Actividad', type: 'task', parent: etId,
+            start: ini, end: fin, duration: dur, progress: av,
+            cost: costo || undefined, fase, registroId: r.id, atrasada: !!(fin < hoy && av < 100),
+          })
+        }
+      }
     }
+    for (const t of out) if (t.type === 'summary' && costAcum[t.id]) t.cost = costAcum[t.id]
     return out
-  }, [minD, maxD, dayW])
+  }, [regsPorFase, etapasPorFase, hoy])
 
-  // marcas de semana (lunes) para el header y las líneas guía del cuerpo
-  const semanas = useMemo(() => {
-    if (!minD || !maxD) return [] as { left: number; label: string }[]
-    const out: { left: number; label: string }[] = []
-    // arranca el lunes de la semana del inicio
-    const cur = new Date(minD.getFullYear(), minD.getMonth(), minD.getDate(), 12)
-    cur.setDate(cur.getDate() - ((cur.getDay() + 6) % 7))
-    while (cur <= maxD) {
-      if (cur >= minD) out.push({ left: xDe(cur), label: String(cur.getDate()).padStart(2, '0') })
-      cur.setDate(cur.getDate() + 7)
+  function abrirEditReg(registroId: string) {
+    let reg: RegistroFase | undefined, fFase = ''
+    for (const f of FASES) {
+      const found = (regsPorFase[f] ?? []).find((r) => r.id === registroId)
+      if (found) { reg = found; fFase = f; break }
     }
-    return out
-  }, [minD, maxD, dayW])
-
-  // días individuales para el header (letra del día de la semana) y para sombrear domingos (no laborables)
-  const dias = useMemo(() => {
-    if (!minD || !maxD) return [] as { left: number; dow: number; dom: number; domingo: boolean }[]
-    const out: { left: number; dow: number; dom: number; domingo: boolean }[] = []
-    const cur = new Date(minD.getFullYear(), minD.getMonth(), minD.getDate(), 12)
-    while (cur <= maxD) {
-      const dow = cur.getDay() // 0=Dom … 6=Sáb
-      out.push({ left: xDe(cur), dow, dom: cur.getDate(), domingo: dow === 0 })
-      cur.setDate(cur.getDate() + 1)
-    }
-    return out
-  }, [minD, maxD, dayW])
-  const DOW = ['D', 'L', 'M', 'M', 'J', 'V', 'S']
-
-  const toggle = (id: string) => setColapsados((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
-
-  function abrirEdit(row: Row) {
-    if (row.tipo !== 'actividad' || !row.registroId) return
-    const reg = Object.values(regsPorFase).flat().find((r) => r.id === row.registroId)
-    setEdit(row)
-    setEditVals({
-      fechaInicio: row.inicio ? toInput(row.inicio) : '',
-      duracionDias: row.inicio && row.fin ? diffDays(row.inicio, row.fin) : 1,
-      avance: row.avance,
-      responsable: row.responsable ?? '',
-      costo: row.costo ?? 0,
-      costoReal: num(reg?.datos?.costoReal) || 0,
+    if (!reg) return
+    const d = reg.datos ?? {}
+    const ini = parseISO(d.fechaInicio)
+    const dur = Math.max(1, num(d.duracionDias))
+    const fin = ini ? addDays(ini, dur) : null
+    const av = Math.round(avanceReg(fFase, reg))
+    const costo = num(d.costoPresupuestado) || (num(d.cantidad) * num(d.precioUnitario)) || 0
+    setEdit({
+      id: `reg:${reg.id}`, tipo: 'actividad', nivel: 2, fase: fFase, nombre: reg.nombre || 'Actividad',
+      inicio: ini, fin, avance: av, responsable: d.responsable, estado: reg.estado, registroId: reg.id,
+      atrasada: !!(fin && fin < hoy && av < 100), hito: false, costo,
     })
-    setIncidencias(Array.isArray(reg?.datos?.anotaciones) ? reg!.datos!.anotaciones : [])
+    setEditVals({ fechaInicio: ini ? toInput(ini) : '', duracionDias: dur, avance: av, responsable: d.responsable ?? '', costo, costoReal: num(d.costoReal) || 0 })
+    setIncidencias(Array.isArray(d.anotaciones) ? d.anotaciones : [])
     setIncidInput('')
   }
   function addIncidencia() {
@@ -322,7 +303,6 @@ export default function CronogramaObraPage() {
   )
 
   const hayFechas = !!minD && !!maxD
-  const vistaActiva: Vista = dayW >= 16 ? 'dia' : dayW <= 7 ? 'mes' : 'semana'
   const abrirChat = () => window.dispatchEvent(new Event('c4:open-chat'))
 
   return (
@@ -367,22 +347,20 @@ export default function CronogramaObraPage() {
 
       {/* Barra de acciones */}
       <div className="bg-white border-b border-slate-200 px-6 py-2.5 flex items-center justify-between gap-3 flex-wrap">
-        <p className="text-xs text-slate-500">Click en una actividad para editar fecha, duración, avance y costo. O pídele a la IA que lo arme.</p>
+        <p className="text-xs text-slate-500">Click en una partida para abrir su panel de control (fechas, encargado, presupuesto e incidencias). O pídele a la IA que lo arme.</p>
         <div className="flex items-center gap-2">
           {/* Vistas: día / semana / mes */}
           <div className="flex items-center rounded-lg border border-slate-200 overflow-hidden">
             {(['dia', 'semana', 'mes'] as Vista[]).map((k) => (
               <button
                 key={k}
-                onClick={() => setDayW(VISTA_W[k])}
-                className={`px-2.5 py-1.5 text-xs font-medium capitalize transition-colors ${vistaActiva === k ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-50'}`}
+                onClick={() => setVista(k)}
+                className={`px-2.5 py-1.5 text-xs font-medium capitalize transition-colors ${vista === k ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-50'}`}
               >
                 {k === 'dia' ? 'Día' : k}
               </button>
             ))}
           </div>
-          <button onClick={() => setDayW((z) => Math.max(2, z - 2))} title="Alejar" className="w-7 h-7 flex items-center justify-center border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-50"><ZoomOut className="w-3.5 h-3.5" /></button>
-          <button onClick={() => setDayW((z) => Math.min(26, z + 2))} title="Acercar" className="w-7 h-7 flex items-center justify-center border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-50"><ZoomIn className="w-3.5 h-3.5" /></button>
           <button onClick={abrirChat} className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-700 text-white text-xs font-medium px-3.5 py-2 rounded-xl transition-colors">
             <Sparkles className="w-3.5 h-3.5" /> Armar con IA
           </button>
@@ -403,104 +381,10 @@ export default function CronogramaObraPage() {
       ) : (
         <div className="p-4">
           <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-            <div className="overflow-x-auto">
-              <div style={{ width: 320 + timelineW }}>
-                {/* Header: mes (arriba) + semanas con día (abajo) */}
-                <div className="flex sticky top-0 z-20 bg-slate-50 border-b border-slate-200">
-                  <div className="sticky left-0 z-30 w-80 shrink-0 bg-slate-50 border-r border-slate-200 px-4 flex items-center text-[11px] font-semibold text-slate-500 uppercase tracking-wide" style={{ height: 44 }}>Actividad</div>
-                  <div className="relative shrink-0" style={{ width: timelineW, height: 44 }}>
-                    {/* fila de meses */}
-                    {meses.map((m, i) => (
-                      <div key={'m' + i} className="absolute top-0 h-6 border-r border-slate-200 bg-slate-100/60 text-[11px] text-slate-600 font-semibold flex items-center px-2 whitespace-nowrap overflow-hidden" style={{ left: m.left, width: m.width }}>
-                        {m.width >= 46 ? m.label : ''}
-                      </div>
-                    ))}
-                    {/* fila de días de la semana: el lunes muestra su fecha; domingo marcado (no laborable) */}
-                    {dias.map((d, i) => (
-                      <div
-                        key={'d' + i}
-                        className={`absolute bottom-0 h-[18px] flex items-center justify-center tabular-nums ${d.domingo ? 'bg-red-50/70' : ''} ${d.dow === 1 ? 'text-[9px] font-bold text-slate-600 border-l border-slate-200' : `text-[8px] ${d.domingo ? 'text-red-400' : 'text-slate-300'}`}`}
-                        style={{ left: d.left, width: dayW }}
-                      >
-                        {d.dow === 1 && dayW >= 5 ? d.dom : (dayW >= 9 ? DOW[d.dow] : '')}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Filas */}
-                <div className="relative">
-                  {/* Domingos sombreados (no laborables) */}
-                  {dias.filter((d) => d.domingo).map((d, i) => (
-                    <div key={'dom' + i} className="absolute top-0 bottom-0 bg-slate-50 z-0 pointer-events-none" style={{ left: 320 + d.left, width: dayW }} />
-                  ))}
-                  {/* Líneas guía de semana */}
-                  {semanas.map((w, i) => (
-                    <div key={'g' + i} className="absolute top-0 bottom-0 w-px bg-slate-100 z-0 pointer-events-none" style={{ left: 320 + w.left }} />
-                  ))}
-                  {/* Línea de HOY */}
-                  {minD && maxD && hoy >= minD && hoy <= maxD && (
-                    <div className="absolute top-0 bottom-0 w-px bg-red-400 z-10 pointer-events-none" style={{ left: 320 + xDe(hoy) }}>
-                      <div className="absolute -top-0 -left-4 text-[9px] text-red-500 font-bold bg-white px-1 rounded">HOY</div>
-                    </div>
-                  )}
-
-                  {rows.map((row) => {
-                    const col = FASE_COLOR[row.fase] ?? FASE_COLOR.construccion
-                    const tieneBar = !!(row.inicio && row.fin)
-                    const left = row.inicio ? xDe(row.inicio) : 0
-                    const width = row.inicio && row.fin ? Math.max(6, diffDays(row.inicio, row.fin) * dayW) : 0
-                    const esGrupo = row.tipo !== 'actividad'
-                    const colapsado = colapsados.has(row.id)
-                    return (
-                      <div key={row.id} className={`flex items-stretch border-b border-slate-50 group ${row.tipo === 'actividad' ? 'hover:bg-slate-50/60 cursor-pointer' : 'bg-slate-50/40'}`}
-                        onClick={() => abrirEdit(row)}>
-                        {/* Columna izquierda (nombre) */}
-                        <div className={`sticky left-0 z-10 w-80 shrink-0 border-r border-slate-200 px-4 py-2 flex items-center gap-1.5 ${row.tipo === 'actividad' ? 'bg-white group-hover:bg-slate-50/60' : 'bg-slate-50/40'}`}
-                          style={{ paddingLeft: 12 + row.nivel * 16 }}>
-                          {esGrupo ? (
-                            <button onClick={(e) => { e.stopPropagation(); toggle(row.id) }} className="text-slate-400 hover:text-slate-600 shrink-0">
-                              {colapsado ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                            </button>
-                          ) : <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${col.bar}`} />}
-                          <div className="min-w-0 flex-1">
-                            <p className={`truncate ${row.nivel === 0 ? 'text-sm font-bold text-slate-800' : row.nivel === 1 ? 'text-xs font-semibold text-slate-700' : 'text-xs text-slate-600'}`}>{row.nombre}</p>
-                            {row.tipo === 'actividad' && row.responsable && (
-                              <p className="text-[10px] text-slate-400 flex items-center gap-0.5 truncate"><User className="w-2.5 h-2.5" />{row.responsable}</p>
-                            )}
-                          </div>
-                          {row.atrasada && <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0" />}
-                          {!!row.costo && (
-                            <span className="text-[10px] tabular-nums shrink-0 text-slate-500 hidden sm:inline" title={`Valor ganado: ${soles(row.valorGanado ?? 0)}`}>{soles(row.costo)}</span>
-                          )}
-                          <span className={`text-[10px] font-semibold tabular-nums shrink-0 w-8 text-right ${row.avance >= 100 ? 'text-emerald-600' : 'text-slate-400'}`}>{row.avance}%</span>
-                        </div>
-                        {/* Timeline */}
-                        <div className="relative shrink-0 py-2" style={{ width: timelineW }}>
-                          {tieneBar ? (
-                            <div className={`absolute h-5 rounded-md ${esGrupo ? `${col.soft} border ${col.text}` : col.bar} shadow-sm overflow-hidden`}
-                              style={{ left, width, top: row.nivel === 0 ? 8 : 9 }}
-                              title={`${row.nombre}: ${fmtCorto(row.inicio!)} → ${fmtCorto(row.fin!)} · ${row.avance}%`}>
-                              {!esGrupo && <div className="absolute inset-y-0 left-0 bg-black/25" style={{ width: `${row.avance}%` }} />}
-                              {row.atrasada && <div className="absolute inset-0 ring-2 ring-red-400 rounded-md" />}
-                              {esGrupo && <div className="absolute inset-y-0 left-0 bg-black/10" style={{ width: `${row.avance}%` }} />}
-                            </div>
-                          ) : (
-                            <div className="absolute left-2 top-2.5 text-[10px] text-slate-300 italic">sin fecha</div>
-                          )}
-                          {row.hito && row.inicio && (
-                            <Flag className="absolute w-3.5 h-3.5 text-slate-700" style={{ left: left - 6, top: 8 }} />
-                          )}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            </div>
+            <GanttSVAR tasks={svarTasks} vista={vista} hoy={hoy} onSelect={abrirEditReg} />
           </div>
           <p className="text-[11px] text-slate-400 mt-3">
-            Las barras claras son fases/etapas (resumen); las de color, actividades. El relleno oscuro es el % de avance. La línea roja es HOY; en rojo, lo atrasado.
+            Las barras de resumen son fases y etapas; las de color, las partidas. El relleno es el % de avance. La línea roja marca HOY y los domingos salen sombreados (no laborables). Click en una partida para abrir su panel de control.
           </p>
         </div>
       )}
