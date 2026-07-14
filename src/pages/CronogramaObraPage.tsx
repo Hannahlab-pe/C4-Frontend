@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import {
   CalendarRange, Loader2, ChevronRight, ChevronDown, CalendarClock,
-  AlertTriangle, Flag, Sparkles, ZoomIn, ZoomOut, User,
+  AlertTriangle, Flag, Sparkles, ZoomIn, ZoomOut, User, X,
 } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 import { API_BASE } from '../lib/config'
@@ -68,6 +68,8 @@ interface Row {
 }
 
 const soles = (n: number) => `S/ ${Math.round(n).toLocaleString('es-PE')}`
+const inputCls = 'w-full text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-blue-400'
+const FASE_LABEL: Record<string, string> = { demolicion: 'Demolición', excavacion: 'Excavación', construccion: 'Construcción', acabados: 'Acabados', administracion: 'Administración' }
 
 export default function CronogramaObraPage() {
   const { id: proyectoId } = useParams<{ id: string }>()
@@ -80,7 +82,9 @@ export default function CronogramaObraPage() {
   const [colapsados, setColapsados] = useState<Set<string>>(new Set())
   const [dayW, setDayW] = useState(11)
   const [edit, setEdit] = useState<Row | null>(null)
-  const [editVals, setEditVals] = useState<{ fechaInicio: string; duracionDias: number; avance: number; responsable: string; costo: number }>({ fechaInicio: '', duracionDias: 1, avance: 0, responsable: '', costo: 0 })
+  const [editVals, setEditVals] = useState<{ fechaInicio: string; duracionDias: number; avance: number; responsable: string; costo: number; costoReal: number }>({ fechaInicio: '', duracionDias: 1, avance: 0, responsable: '', costo: 0, costoReal: 0 })
+  const [incidencias, setIncidencias] = useState<{ id: string; fecha: string; texto: string }[]>([])
+  const [incidInput, setIncidInput] = useState('')
   const [guardandoEdit, setGuardandoEdit] = useState(false)
   const [cfg, setCfg] = useState<any>({})
 
@@ -245,10 +249,25 @@ export default function CronogramaObraPage() {
     return out
   }, [minD, maxD, dayW])
 
+  // días individuales para el header (letra del día de la semana) y para sombrear domingos (no laborables)
+  const dias = useMemo(() => {
+    if (!minD || !maxD) return [] as { left: number; dow: number; dom: number; domingo: boolean }[]
+    const out: { left: number; dow: number; dom: number; domingo: boolean }[] = []
+    const cur = new Date(minD.getFullYear(), minD.getMonth(), minD.getDate(), 12)
+    while (cur <= maxD) {
+      const dow = cur.getDay() // 0=Dom … 6=Sáb
+      out.push({ left: xDe(cur), dow, dom: cur.getDate(), domingo: dow === 0 })
+      cur.setDate(cur.getDate() + 1)
+    }
+    return out
+  }, [minD, maxD, dayW])
+  const DOW = ['D', 'L', 'M', 'M', 'J', 'V', 'S']
+
   const toggle = (id: string) => setColapsados((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
 
   function abrirEdit(row: Row) {
     if (row.tipo !== 'actividad' || !row.registroId) return
+    const reg = Object.values(regsPorFase).flat().find((r) => r.id === row.registroId)
     setEdit(row)
     setEditVals({
       fechaInicio: row.inicio ? toInput(row.inicio) : '',
@@ -256,7 +275,19 @@ export default function CronogramaObraPage() {
       avance: row.avance,
       responsable: row.responsable ?? '',
       costo: row.costo ?? 0,
+      costoReal: num(reg?.datos?.costoReal) || 0,
     })
+    setIncidencias(Array.isArray(reg?.datos?.anotaciones) ? reg!.datos!.anotaciones : [])
+    setIncidInput('')
+  }
+  function addIncidencia() {
+    const t = incidInput.trim()
+    if (!t) return
+    setIncidencias((xs) => [...xs, { id: Math.random().toString(36).slice(2, 9), fecha: new Date().toISOString().slice(0, 10), texto: t }])
+    setIncidInput('')
+  }
+  function removeIncidencia(id: string) {
+    setIncidencias((xs) => xs.filter((a) => a.id !== id))
   }
 
   async function guardarEdit() {
@@ -271,6 +302,8 @@ export default function CronogramaObraPage() {
       avance: clamp(num(editVals.avance)),
       responsable: editVals.responsable || undefined,
       costoPresupuestado: num(editVals.costo) || undefined,
+      costoReal: num(editVals.costoReal) || undefined,
+      anotaciones: incidencias,
     }
     try {
       const r = await fetch(`${API_BASE}/registros-fase/${edit.registroId}`, { method: 'PATCH', headers, body: JSON.stringify({ datos }) })
@@ -366,10 +399,14 @@ export default function CronogramaObraPage() {
                         {m.width >= 46 ? m.label : ''}
                       </div>
                     ))}
-                    {/* fila de semanas (día del lunes) */}
-                    {semanas.map((w, i) => (
-                      <div key={'w' + i} className="absolute bottom-0 h-[18px] border-l border-slate-200 text-[9px] text-slate-400 flex items-center pl-1 tabular-nums" style={{ left: w.left, width: dayW * 7 }}>
-                        {w.label}
+                    {/* fila de días de la semana: el lunes muestra su fecha; domingo marcado (no laborable) */}
+                    {dias.map((d, i) => (
+                      <div
+                        key={'d' + i}
+                        className={`absolute bottom-0 h-[18px] flex items-center justify-center tabular-nums ${d.domingo ? 'bg-red-50/70' : ''} ${d.dow === 1 ? 'text-[9px] font-bold text-slate-600 border-l border-slate-200' : `text-[8px] ${d.domingo ? 'text-red-400' : 'text-slate-300'}`}`}
+                        style={{ left: d.left, width: dayW }}
+                      >
+                        {dayW >= 9 ? (d.dow === 1 ? d.dom : DOW[d.dow]) : ''}
                       </div>
                     ))}
                   </div>
@@ -377,6 +414,10 @@ export default function CronogramaObraPage() {
 
                 {/* Filas */}
                 <div className="relative">
+                  {/* Domingos sombreados (no laborables) */}
+                  {dias.filter((d) => d.domingo).map((d, i) => (
+                    <div key={'dom' + i} className="absolute top-0 bottom-0 bg-slate-50 z-0 pointer-events-none" style={{ left: 320 + d.left, width: dayW }} />
+                  ))}
                   {/* Líneas guía de semana */}
                   {semanas.map((w, i) => (
                     <div key={'g' + i} className="absolute top-0 bottom-0 w-px bg-slate-100 z-0 pointer-events-none" style={{ left: 320 + w.left }} />
@@ -448,44 +489,125 @@ export default function CronogramaObraPage() {
         </div>
       )}
 
-      {/* Modal editar actividad */}
-      <AppDialog open={edit !== null} onClose={() => setEdit(null)} title="Editar actividad del cronograma">
+      {/* Panel de control de la partida */}
+      <AppDialog open={edit !== null} onClose={() => setEdit(null)} title="Control de la partida" wide>
         {edit && (() => {
           const regE = Object.values(regsPorFase).flat().find((r) => r.id === edit.registroId)
-          const f = regE?.datos?.fundamentoDuracion
+          const d = regE?.datos ?? {}
+          const f = d.fundamentoDuracion
+          const metrado = num(d.cantidad), pu = num(d.precioUnitario), unidad = d.unidad
+          const iniD = editVals.fechaInicio ? new Date(editVals.fechaInicio + 'T12:00:00') : null
+          const finD = iniD ? addDays(iniD, Math.max(1, num(editVals.duracionDias))) : null
+          const ppto = num(editVals.costo), real = num(editVals.costoReal)
+          const ganado = ppto * clamp(editVals.avance) / 100
+          const desvio = real - ppto
+          const sem = real <= 0
+            ? { c: 'slate', ico: '⚪', t: 'Sin costo real registrado aún' }
+            : desvio > 0
+              ? { c: 'red', ico: '🔴', t: `Excedido en ${soles(desvio)} sobre lo presupuestado` }
+              : real >= ppto * 0.9
+                ? { c: 'amber', ico: '🟡', t: `Al límite — te queda ${soles(ppto - real)}` }
+                : { c: 'emerald', ico: '🟢', t: `Dentro de presupuesto — te queda ${soles(ppto - real)}` }
+          const SC: Record<string, string> = {
+            slate: 'bg-slate-50 border-slate-200 text-slate-600',
+            red: 'bg-red-50 border-red-200 text-red-700',
+            amber: 'bg-amber-50 border-amber-200 text-amber-700',
+            emerald: 'bg-emerald-50 border-emerald-200 text-emerald-700',
+          }
           return (
-          <div className="space-y-4">
-            <p className="text-sm font-semibold text-slate-800">{edit.nombre}</p>
+          <div className="space-y-5">
+            {/* Encabezado */}
+            <div>
+              <p className="text-sm font-semibold text-slate-800">{edit.nombre}</p>
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">{FASE_LABEL[edit.fase] ?? edit.fase}</span>
+                {edit.estado && <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">{edit.estado}</span>}
+                {edit.atrasada && <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-600">Atrasada</span>}
+              </div>
+            </div>
+
             {f && (
               <p className="text-[11px] text-blue-700 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2 leading-relaxed">
-                📐 Duración calculada: <b>{Number(f.metrado).toLocaleString('es-PE')} {f.unidad ?? ''}</b> ÷ {f.rendimiento_diario}/día{f.frentes > 1 ? ` ÷ ${f.frentes} frentes` : ''} = <b>{f.dias_utiles} días útiles</b> (metrado ÷ rendimiento).
+                📐 Duración calculada: <b>{Number(f.metrado).toLocaleString('es-PE')} {f.unidad ?? ''}</b> ÷ {f.rendimiento_diario}/día{f.frentes > 1 ? ` ÷ ${f.frentes} frentes` : ''} = <b>{f.dias_utiles} días útiles</b>{f.estimado ? ' (rendimiento referencial — ajústalo)' : ''}.
               </p>
             )}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Fecha de inicio</label>
-                <input type="date" className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-blue-400" value={editVals.fechaInicio} onChange={(e) => setEditVals((v) => ({ ...v, fechaInicio: e.target.value }))} />
+
+            {/* Fechas y avance */}
+            <section>
+              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">📅 Fechas y avance</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Inicio</label>
+                  <input type="date" className={inputCls} value={editVals.fechaInicio} onChange={(e) => setEditVals((v) => ({ ...v, fechaInicio: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Duración (días)</label>
+                  <input type="number" min={1} className={inputCls} value={editVals.duracionDias} onChange={(e) => setEditVals((v) => ({ ...v, duracionDias: num(e.target.value) }))} />
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Duración (días)</label>
-                <input type="number" min={1} className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-blue-400" value={editVals.duracionDias} onChange={(e) => setEditVals((v) => ({ ...v, duracionDias: num(e.target.value) }))} />
+              {iniD && finD && <p className="text-[11px] text-slate-500 mt-1.5">Va del <b>{fmtCorto(iniD)}</b> al <b>{fmtCorto(finD)}</b>.</p>}
+              <div className="mt-3">
+                <label className="block text-xs font-medium text-slate-600 mb-1">Avance: <span className="font-semibold text-slate-800">{editVals.avance}%</span></label>
+                <input type="range" min={0} max={100} step={5} className="w-full accent-slate-800" value={editVals.avance} onChange={(e) => setEditVals((v) => ({ ...v, avance: num(e.target.value) }))} />
               </div>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Avance: <span className="font-semibold text-slate-800">{editVals.avance}%</span></label>
-              <input type="range" min={0} max={100} step={5} className="w-full accent-slate-800" value={editVals.avance} onChange={(e) => setEditVals((v) => ({ ...v, avance: num(e.target.value) }))} />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Responsable</label>
-                <input className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-blue-400" value={editVals.responsable} onChange={(e) => setEditVals((v) => ({ ...v, responsable: e.target.value }))} placeholder="Nombre del responsable" />
+            </section>
+
+            {/* Encargado */}
+            <section>
+              <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">👷 Encargado</label>
+              <input className={inputCls} value={editVals.responsable} onChange={(e) => setEditVals((v) => ({ ...v, responsable: e.target.value }))} placeholder="Nombre del responsable / cuadrilla" />
+            </section>
+
+            {/* Presupuesto vs real */}
+            <section>
+              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">💰 Presupuesto de la partida</p>
+              {metrado > 0 && pu > 0 && (
+                <p className="text-[11px] text-slate-500 mb-2">Metrado <b>{metrado.toLocaleString('es-PE')} {unidad ?? ''}</b> × PU <b>{soles(pu)}</b> = <b>{soles(metrado * pu)}</b></p>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Presupuestado (S/)</label>
+                  <input type="number" className={inputCls} value={editVals.costo || ''} onChange={(e) => setEditVals((v) => ({ ...v, costo: num(e.target.value) }))} placeholder="0" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Costo real / gastado (S/)</label>
+                  <input type="number" className={inputCls} value={editVals.costoReal || ''} onChange={(e) => setEditVals((v) => ({ ...v, costoReal: num(e.target.value) }))} placeholder="0" />
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Costo presupuestado (S/)</label>
-                <input type="number" className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-blue-400" value={editVals.costo || ''} onChange={(e) => setEditVals((v) => ({ ...v, costo: num(e.target.value) }))} placeholder="0" />
-                {editVals.costo > 0 && <p className="text-[10px] text-slate-400 mt-1">Valor ganado: {soles(editVals.costo * clamp(editVals.avance) / 100)} ({clamp(editVals.avance)}%)</p>}
+              {ppto > 0 && (
+                <div className={`mt-2 text-[11px] rounded-xl px-3 py-2 border ${SC[sem.c]}`}>
+                  <b>{sem.ico} {sem.t}</b>
+                  <span className="block mt-0.5 text-slate-500">Valor ganado (avance × presupuestado): {soles(ganado)} ({clamp(editVals.avance)}%)</span>
+                </div>
+              )}
+            </section>
+
+            {/* Incidencias / bitácora */}
+            <section>
+              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">📋 Incidencias / bitácora</p>
+              <div className="flex gap-2">
+                <input
+                  className={inputCls}
+                  value={incidInput}
+                  onChange={(e) => setIncidInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addIncidencia() } }}
+                  placeholder="Ej: llovió, se atrasó 1 día / faltó fierro"
+                />
+                <button onClick={addIncidencia} className="shrink-0 text-sm font-medium text-white bg-slate-900 hover:bg-slate-700 px-3 rounded-xl">Agregar</button>
               </div>
-            </div>
+              {incidencias.length > 0 && (
+                <ul className="mt-2 space-y-1.5">
+                  {incidencias.map((a) => (
+                    <li key={a.id} className="flex items-start gap-2 text-xs bg-slate-50 rounded-lg px-3 py-2">
+                      <span className="text-[10px] text-slate-400 shrink-0 mt-0.5 tabular-nums">{a.fecha}</span>
+                      <span className="flex-1 text-slate-700">{a.texto}</span>
+                      <button onClick={() => removeIncidencia(a.id)} className="text-slate-300 hover:text-red-400 shrink-0"><X className="w-3.5 h-3.5" /></button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
             <div className="flex gap-2 pt-1">
               <button onClick={() => setEdit(null)} className="flex-1 text-sm text-slate-600 border border-slate-200 py-2.5 rounded-xl hover:bg-slate-50">Cancelar</button>
               <button onClick={guardarEdit} disabled={guardandoEdit} className="flex-1 text-sm font-medium text-white bg-slate-900 hover:bg-slate-700 py-2.5 rounded-xl transition-colors disabled:opacity-50">{guardandoEdit ? 'Guardando...' : 'Guardar'}</button>
