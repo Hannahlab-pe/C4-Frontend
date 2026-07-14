@@ -114,13 +114,21 @@ export default function EquipoPage() {
   )
 
   return (
-    <div className="h-full overflow-y-auto p-4 md:p-6 space-y-5">
-      <div>
-        <h2 className="text-lg font-bold text-slate-800">Equipo del proyecto</h2>
-        <p className="text-xs text-slate-400 mt-0.5">
-          {soyJefe ? 'Registra a tu equipo y asígnales su rol y fase. Cada uno entra con su correo y verá lo suyo.' : 'Equipo asignado a este proyecto.'}
-        </p>
+    <div className="h-full overflow-y-auto">
+      {/* Header azul noche (igual que el Cronograma) */}
+      <div className="bg-linear-to-r from-slate-800 to-slate-700 px-4 md:px-6 py-4 md:py-5 text-white">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center shrink-0"><Users className="w-5 h-5" /></div>
+          <div className="min-w-0">
+            <h2 className="text-base font-bold">Equipo del proyecto</h2>
+            <p className="text-xs text-slate-300 mt-0.5">
+              {soyJefe ? 'Registra a tu equipo y asígnales su rol y fase. Cada uno entra con su correo y verá lo suyo.' : 'Equipo asignado a este proyecto.'}
+            </p>
+          </div>
+        </div>
       </div>
+
+      <div className="p-4 md:p-6 space-y-5">
 
       {/* Registrar trabajador (solo jefe de proyecto) */}
       {soyJefe && (
@@ -257,6 +265,7 @@ export default function EquipoPage() {
             <button onClick={agregarTrabajadorManual} className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-700 text-white text-xs font-medium px-3 py-2 rounded-xl shrink-0"><Plus className="w-3.5 h-3.5" /> Agregar</button>
           </div>
         )}
+      </div>
       </div>
 
       {/* Editar miembro */}

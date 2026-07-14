@@ -97,11 +97,19 @@ export default function LogisticaPage() {
   )
 
   return (
-    <div className="h-full overflow-y-auto p-4 md:p-6 space-y-5">
-      <div>
-        <h2 className="text-lg font-bold text-slate-800">Logística de obra</h2>
-        <p className="text-xs text-slate-400 mt-0.5">Recepción de materiales y control de camiones. La IA registra desde una foto por Telegram.</p>
+    <div className="h-full overflow-y-auto">
+      {/* Header azul noche (igual que el Cronograma) */}
+      <div className="bg-linear-to-r from-slate-800 to-slate-700 px-4 md:px-6 py-4 md:py-5 text-white">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center shrink-0"><Truck className="w-5 h-5" /></div>
+          <div className="min-w-0">
+            <h2 className="text-base font-bold">Logística de obra</h2>
+            <p className="text-xs text-slate-300 mt-0.5">Recepción de materiales y control de camiones. La IA registra desde una foto por Telegram.</p>
+          </div>
+        </div>
       </div>
+
+      <div className="p-4 md:p-6 space-y-5">
 
       {/* KPIs */}
       <div className="grid grid-cols-3 gap-3">
@@ -264,6 +272,7 @@ export default function LogisticaPage() {
           <img src={lightbox} alt="" className="max-w-full max-h-full rounded-lg object-contain" />
         </div>
       )}
+      </div>
     </div>
   )
 }

@@ -800,40 +800,42 @@ export default function ProyectoFasePage() {
       <input ref={fileInputRef} type="file" className="hidden"
         accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" onChange={onArchivoElegido} />
 
-      {/* ── Header unificado ── */}
-      <div className="bg-white border-b border-slate-200 px-4 md:px-6 pt-4 md:pt-5">
+      {/* ── Header azul noche (igual que el Cronograma) ── */}
+      <div className="bg-linear-to-r from-slate-800 to-slate-700 px-4 md:px-6 py-4 md:py-5 text-white">
         <div className="flex items-center gap-3 md:gap-4 mb-4">
-          <div className="relative w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center shrink-0">
+          <div className="relative w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
             <Icon className="w-5 h-5 text-white" />
-            <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${config.accent}`} />
+            <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-slate-800 ${config.accent}`} />
           </div>
           <div className="flex-1 min-w-0">
-            <h1 className="text-base font-bold text-slate-900 leading-tight truncate">{config.nombre}</h1>
-            <p className="text-xs text-slate-400 mt-0.5 truncate">{config.descripcion}</p>
+            <h1 className="text-base font-bold leading-tight truncate">{config.nombre}</h1>
+            <p className="text-xs text-slate-300 mt-0.5 truncate">{config.descripcion}</p>
           </div>
           <div className="flex items-center gap-2 md:gap-3 shrink-0">
             <div className="text-right">
-              <p className="text-[10px] text-slate-400 uppercase tracking-wider whitespace-nowrap">Avance<span className="hidden sm:inline"> de fase</span></p>
-              <p className="text-sm font-bold text-slate-900">{avanceGlobal}%</p>
+              <p className="text-[10px] text-slate-300 uppercase tracking-wider whitespace-nowrap">Avance<span className="hidden sm:inline"> de fase</span></p>
+              <p className="text-sm font-bold">{avanceGlobal}%</p>
             </div>
-            <div className="hidden sm:block w-20 md:w-28 bg-slate-100 rounded-full h-1.5">
-              <div className="bg-slate-900 h-1.5 rounded-full transition-all duration-500" style={{ width: `${avanceGlobal}%` }} />
+            <div className="hidden sm:block w-20 md:w-28 bg-white/20 rounded-full h-1.5">
+              <div className="bg-white h-1.5 rounded-full transition-all duration-500" style={{ width: `${avanceGlobal}%` }} />
             </div>
           </div>
         </div>
 
-        {/* KPIs — en mobile 3 por fila como mini-cards; en desktop tira dividida */}
-        <div className="grid grid-cols-3 gap-2 mb-3 md:gap-0 md:mb-0 md:[grid-template-columns:var(--kpi-cols)] md:border md:border-slate-200 md:rounded-t-2xl md:divide-x md:divide-slate-100 md:bg-slate-50/50"
+        {/* KPIs */}
+        <div className="grid grid-cols-3 gap-2 md:gap-3 md:[grid-template-columns:var(--kpi-cols)]"
           style={{ ['--kpi-cols' as any]: `repeat(${kpis.length}, minmax(0, 1fr))` }}>
           {kpis.map((k) => (
-            <div key={k.label} className="px-3 md:px-4 py-2.5 md:py-3 rounded-xl md:rounded-none border border-slate-200 md:border-0 bg-slate-50/50 md:bg-transparent">
-              <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-0.5 truncate">{k.label}</p>
-              <p className="text-sm font-bold text-slate-900 truncate" title={k.value}>{k.value}</p>
+            <div key={k.label} className="bg-white/10 rounded-xl px-3 py-2.5">
+              <p className="text-[10px] text-slate-300 uppercase tracking-wider mb-0.5 truncate">{k.label}</p>
+              <p className="text-sm font-bold truncate" title={k.value}>{k.value}</p>
             </div>
           ))}
         </div>
+      </div>
 
-        {/* Tabs */}
+      {/* ── Tabs (barra blanca) ── */}
+      <div className="bg-white border-b border-slate-200 px-4 md:px-6">
         <div className="flex gap-0 overflow-x-auto">
           {TABS.map(({ key, label, icon: TabIcon, badge }) => (
             <button

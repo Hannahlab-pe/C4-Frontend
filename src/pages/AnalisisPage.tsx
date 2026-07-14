@@ -180,21 +180,25 @@ export default function AnalisisPage() {
   const grua = c ? recomendarGrua(c.pisos_vivienda) : null
 
   return (
-    <div className="h-full overflow-y-auto p-6 space-y-5">
+    <div className="h-full overflow-y-auto">
 
-      {/* Header + Veredicto */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h2 className="text-base font-bold text-slate-800">{FASE_TITULO[fase]}</h2>
-          {data?.distrito && <p className="text-xs text-slate-400 mt-0.5">{data.distrito}</p>}
-        </div>
-        {fase === 'previo' && veredicto && (
-          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm font-semibold ${veredicto.cls}`}>
-            <veredicto.Icon className="w-4 h-4" />
-            {veredicto.txt}
+      {/* Header azul noche (igual que el Cronograma) */}
+      <div className="bg-linear-to-r from-slate-800 to-slate-700 px-6 py-4 md:py-5 text-white">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h2 className="text-base font-bold">{FASE_TITULO[fase]}</h2>
+            {data?.distrito && <p className="text-xs text-slate-300 mt-0.5">{data.distrito}</p>}
           </div>
-        )}
+          {fase === 'previo' && veredicto && (
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold ${veredicto.cls}`}>
+              <veredicto.Icon className="w-4 h-4" />
+              {veredicto.txt}
+            </div>
+          )}
+        </div>
       </div>
+
+      <div className="p-6 space-y-5">
 
       {/* Switcher de fases del proyecto: cómo empezó / cómo va / cómo terminó */}
       <div className="flex gap-1 bg-slate-100 rounded-xl p-1 w-fit">
@@ -371,6 +375,7 @@ export default function AnalisisPage() {
               onChange={(cierre) => setSeguimiento((s) => ({ ...s, cierre }))} />
           : <p className="text-sm text-slate-400">Ejecuta el análisis de pre-inversión primero para habilitar el cierre de obra.</p>
       )}
+      </div>
     </div>
   )
 }
