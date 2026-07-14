@@ -35,6 +35,8 @@ const diffDays = (a: Date, b: Date) => Math.round((b.getTime() - a.getTime()) / 
 const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)))
 const toInput = (d: Date) => d.toISOString().slice(0, 10)
 const fmtCorto = (d: Date) => d.toLocaleDateString('es-PE', { day: '2-digit', month: 'short' })
+const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+const fmtMes = (d: Date) => `${MESES[d.getMonth()]} ${d.getFullYear()}`
 
 const num = (v: any) => { const n = Number(v); return Number.isFinite(n) ? n : 0 }
 
@@ -76,7 +78,7 @@ export default function CronogramaObraPage() {
   const [regsPorFase, setRegsPorFase] = useState<Record<string, RegistroFase[]>>({})
   const [loading, setLoading] = useState(true)
   const [colapsados, setColapsados] = useState<Set<string>>(new Set())
-  const [dayW, setDayW] = useState(6)
+  const [dayW, setDayW] = useState(11)
   const [edit, setEdit] = useState<Row | null>(null)
   const [editVals, setEditVals] = useState<{ fechaInicio: string; duracionDias: number; avance: number; responsable: string; costo: number }>({ fechaInicio: '', duracionDias: 1, avance: 0, responsable: '', costo: 0 })
   const [guardandoEdit, setGuardandoEdit] = useState(false)
@@ -223,11 +225,22 @@ export default function CronogramaObraPage() {
       const next = new Date(cur.getFullYear(), cur.getMonth() + 1, 1, 12)
       const ini = cur < minD ? minD : cur
       const fin = next > maxD ? maxD : next
-      out.push({
-        label: cur.toLocaleDateString('es-PE', { month: 'short', year: '2-digit' }),
-        left: xDe(ini), width: Math.max(0, diffDays(ini, fin) * dayW),
-      })
+      out.push({ label: fmtMes(cur), left: xDe(ini), width: Math.max(0, diffDays(ini, fin) * dayW) })
       cur = next
+    }
+    return out
+  }, [minD, maxD, dayW])
+
+  // marcas de semana (lunes) para el header y las líneas guía del cuerpo
+  const semanas = useMemo(() => {
+    if (!minD || !maxD) return [] as { left: number; label: string }[]
+    const out: { left: number; label: string }[] = []
+    // arranca el lunes de la semana del inicio
+    const cur = new Date(minD.getFullYear(), minD.getMonth(), minD.getDate(), 12)
+    cur.setDate(cur.getDate() - ((cur.getDay() + 6) % 7))
+    while (cur <= maxD) {
+      if (cur >= minD) out.push({ left: xDe(cur), label: String(cur.getDate()).padStart(2, '0') })
+      cur.setDate(cur.getDate() + 7)
     }
     return out
   }, [minD, maxD, dayW])
@@ -343,13 +356,20 @@ export default function CronogramaObraPage() {
           <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
             <div className="overflow-x-auto">
               <div style={{ width: 320 + timelineW }}>
-                {/* Header de meses */}
+                {/* Header: mes (arriba) + semanas con día (abajo) */}
                 <div className="flex sticky top-0 z-20 bg-slate-50 border-b border-slate-200">
-                  <div className="sticky left-0 z-30 w-80 shrink-0 bg-slate-50 border-r border-slate-200 px-4 py-2 text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Actividad</div>
-                  <div className="relative shrink-0" style={{ width: timelineW, height: 32 }}>
+                  <div className="sticky left-0 z-30 w-80 shrink-0 bg-slate-50 border-r border-slate-200 px-4 flex items-center text-[11px] font-semibold text-slate-500 uppercase tracking-wide" style={{ height: 44 }}>Actividad</div>
+                  <div className="relative shrink-0" style={{ width: timelineW, height: 44 }}>
+                    {/* fila de meses */}
                     {meses.map((m, i) => (
-                      <div key={i} className="absolute top-0 bottom-0 border-r border-slate-200 text-[11px] text-slate-500 font-medium flex items-center px-2 capitalize" style={{ left: m.left, width: m.width }}>
-                        {m.label}
+                      <div key={'m' + i} className="absolute top-0 h-6 border-r border-slate-200 bg-slate-100/60 text-[11px] text-slate-600 font-semibold flex items-center px-2 whitespace-nowrap overflow-hidden" style={{ left: m.left, width: m.width }}>
+                        {m.width >= 46 ? m.label : ''}
+                      </div>
+                    ))}
+                    {/* fila de semanas (día del lunes) */}
+                    {semanas.map((w, i) => (
+                      <div key={'w' + i} className="absolute bottom-0 h-[18px] border-l border-slate-200 text-[9px] text-slate-400 flex items-center pl-1 tabular-nums" style={{ left: w.left, width: dayW * 7 }}>
+                        {w.label}
                       </div>
                     ))}
                   </div>
@@ -357,6 +377,10 @@ export default function CronogramaObraPage() {
 
                 {/* Filas */}
                 <div className="relative">
+                  {/* Líneas guía de semana */}
+                  {semanas.map((w, i) => (
+                    <div key={'g' + i} className="absolute top-0 bottom-0 w-px bg-slate-100 z-0 pointer-events-none" style={{ left: 320 + w.left }} />
+                  ))}
                   {/* Línea de HOY */}
                   {minD && maxD && hoy >= minD && hoy <= maxD && (
                     <div className="absolute top-0 bottom-0 w-px bg-red-400 z-10 pointer-events-none" style={{ left: 320 + xDe(hoy) }}>
