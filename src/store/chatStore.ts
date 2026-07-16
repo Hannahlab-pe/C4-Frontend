@@ -7,7 +7,7 @@ export interface ChatMensaje {
   rol: 'user' | 'assistant' | 'pdf' | 'plano' | 'excel'
   contenido: string
   streaming?: boolean
-  adjunto?: { nombre: string; tipo: string; base64: string }
+  adjuntos?: { nombre: string; tipo: string; base64: string }[]
 }
 export interface ChatStep { text: string; icon: string; done: boolean }
 
@@ -39,7 +39,7 @@ interface ChatStore {
   setWidth: (n: number) => void
   toggleExpanded: () => void
   cargarSesion: (proyectoId: string) => Promise<void>
-  enviar: (texto: string, archivo?: { nombre: string; tipo: string; base64: string }, faseActual?: string) => Promise<void>
+  enviar: (texto: string, archivos?: { nombre: string; tipo: string; base64: string }[], faseActual?: string) => Promise<void>
   confirmar: () => Promise<void>
   cancelar: () => Promise<void>
 }
@@ -165,7 +165,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
       } catch { /* noop */ }
     },
 
-    enviar: async (texto, archivo, faseActual) => {
+    enviar: async (texto, archivos, faseActual) => {
       const { sending, proyectoId } = get()
       if (!texto.trim() || sending || !proyectoId) return
       const token = useAuthStore.getState().token
@@ -178,7 +178,7 @@ export const useChatStore = create<ChatStore>((set, get) => {
         steps: [{ text: 'Analizando tu mensaje...', icon: 'think', done: false }],
         mensajes: [
           ...s.mensajes,
-          { id: userId, rol: 'user', contenido: texto.trim(), adjunto: archivo },
+          { id: userId, rol: 'user', contenido: texto.trim(), adjuntos: archivos },
           { id: assistantId, rol: 'assistant', contenido: '', streaming: true },
         ],
       }))
@@ -191,7 +191,8 @@ export const useChatStore = create<ChatStore>((set, get) => {
             proyectoId,
             mensaje: texto.trim(),
             ...(faseActual && { faseActual }),
-            ...(archivo && { archivoBase64: archivo.base64, archivoNombre: archivo.nombre, archivoTipo: archivo.tipo }),
+            ...(archivos?.length === 1 && { archivoBase64: archivos[0].base64, archivoNombre: archivos[0].nombre, archivoTipo: archivos[0].tipo }),
+            ...(archivos && archivos.length > 1 && { archivos }),
           }),
         })
         if (!res.ok || !res.body) throw new Error('stream failed')

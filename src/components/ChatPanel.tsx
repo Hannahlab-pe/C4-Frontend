@@ -51,7 +51,7 @@ export default function ChatPanel({ proyectoId }: Props) {
   const toggleExpanded = useChatStore((s) => s.toggleExpanded)
 
   const [input, setInput] = useState('')
-  const [archivo, setArchivo] = useState<{ nombre: string; tipo: string; base64: string } | null>(null)
+  const [archivos, setArchivos] = useState<{ nombre: string; tipo: string; base64: string }[]>([])
   const [docs, setDocs] = useState<{ id: string; nombre: string; tipo: string }[]>([])
   const [subiendoDoc, setSubiendoDoc] = useState(false)
 
@@ -153,14 +153,14 @@ export default function ChatPanel({ proyectoId }: Props) {
   }, [mensajes])
 
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => {
-      const base64 = (reader.result as string).split(',')[1]
-      setArchivo({ nombre: file.name, tipo: file.type, base64 })
-    }
-    reader.readAsDataURL(file)
+    const files = Array.from(e.target.files ?? [])
+    if (!files.length) return
+    Promise.all(files.map((file) => new Promise<{ nombre: string; tipo: string; base64: string }>((res, rej) => {
+      const reader = new FileReader()
+      reader.onload = () => res({ nombre: file.name, tipo: file.type, base64: (reader.result as string).split(',')[1] })
+      reader.onerror = rej
+      reader.readAsDataURL(file)
+    }))).then((nuevos) => setArchivos((prev) => [...prev, ...nuevos].slice(0, 6)))
     e.target.value = ''
   }, [])
 
@@ -194,13 +194,13 @@ export default function ChatPanel({ proyectoId }: Props) {
     if (escuchando) mediaRef.current?.stop()
     const userMsg = input.trim()
     setInput('')
-    const adjunto = archivo ?? undefined
-    setArchivo(null)
+    const adjuntos = archivos.length ? archivos : undefined
+    setArchivos([])
     // Fase que el usuario está viendo (contexto para la IA)
     const m = pathname.match(/\/panel\/(demolicion|excavacion|construccion|acabados|administracion)/)
     const faseActual = m?.[1]
     // El streaming corre en el store: continúa aunque navegues o desmontes el panel
-    enviar(userMsg, adjunto, faseActual)
+    enviar(userMsg, adjuntos, faseActual)
   }
 
   // Enviar una pregunta sugerida del carrusel directamente
@@ -375,20 +375,21 @@ export default function ChatPanel({ proyectoId }: Props) {
             }`}>
               {msg.rol === 'user' ? (
                 <div className="space-y-2">
-                  {msg.adjunto && (
-                    msg.adjunto.tipo.startsWith('image/') ? (
+                  {msg.adjuntos?.map((a, i) => (
+                    a.tipo.startsWith('image/') ? (
                       <img
-                        src={`data:${msg.adjunto.tipo};base64,${msg.adjunto.base64}`}
-                        alt={msg.adjunto.nombre}
+                        key={i}
+                        src={`data:${a.tipo};base64,${a.base64}`}
+                        alt={a.nombre}
                         className="max-w-50 rounded-xl block"
                       />
                     ) : (
-                      <div className="flex items-center gap-1.5 bg-blue-500/30 rounded-lg px-2 py-1">
+                      <div key={i} className="flex items-center gap-1.5 bg-blue-500/30 rounded-lg px-2 py-1">
                         <FileText className="w-3 h-3 shrink-0" />
-                        <span className="text-xs truncate max-w-40">{msg.adjunto.nombre}</span>
+                        <span className="text-xs truncate max-w-40">{a.nombre}</span>
                       </div>
                     )
-                  )}
+                  ))}
                   {msg.contenido && <span className="whitespace-pre-wrap">{msg.contenido}</span>}
                 </div>
               ) : msg.contenido ? (
@@ -520,18 +521,20 @@ export default function ChatPanel({ proyectoId }: Props) {
 
       {/* Input */}
       <div className="bg-white border-t border-slate-200 px-4 py-3 shrink-0">
-        {archivo && (
-          <div className="flex items-center gap-2 mb-2">
-            <div className="flex items-center gap-1.5 bg-blue-50 border border-blue-200 text-blue-700 text-xs font-medium px-2.5 py-1 rounded-lg">
-              <FileText className="w-3 h-3 shrink-0" />
-              <span className="max-w-50 truncate">{archivo.nombre}</span>
-              <button onClick={() => setArchivo(null)} className="text-blue-400 hover:text-blue-600 ml-1">
-                <X className="w-3 h-3" />
-              </button>
-            </div>
+        {archivos.length > 0 && (
+          <div className="flex items-center flex-wrap gap-2 mb-2">
+            {archivos.map((a, i) => (
+              <div key={i} className="flex items-center gap-1.5 bg-blue-50 border border-blue-200 text-blue-700 text-xs font-medium px-2.5 py-1 rounded-lg">
+                <FileText className="w-3 h-3 shrink-0" />
+                <span className="max-w-40 truncate">{a.nombre}</span>
+                <button onClick={() => setArchivos((prev) => prev.filter((_, j) => j !== i))} className="text-blue-400 hover:text-blue-600 ml-1">
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
           </div>
         )}
-        <input ref={fileInputRef} type="file" accept=".pdf,.dxf,.xlsx,.xls,.csv,image/*" className="hidden" onChange={handleFileChange} />
+        <input ref={fileInputRef} type="file" multiple accept=".pdf,.dxf,.xlsx,.xls,.csv,image/*" className="hidden" onChange={handleFileChange} />
         <div className="flex items-end gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 focus-within:border-blue-300 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
           <button
             onClick={() => fileInputRef.current?.click()}
