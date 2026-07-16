@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
-  BarChart2, HardHat, Archive, MapPin,
+  BarChart2, HardHat, Archive, MapPin, Wallet,
   SlidersHorizontal, CircleHelp,
   LogOut, PanelLeftClose, PanelLeftOpen, X,
 } from 'lucide-react'
@@ -11,8 +11,9 @@ import AppDialog from './AppDialog'
 import clsx from 'clsx'
 
 const navItems = [
-  { to: '/dashboard', icon: BarChart2, label: 'Dashboard'  },
-  { to: '/proyectos', icon: HardHat,   label: 'Proyectos'  },
+  { to: '/dashboard',    icon: BarChart2, label: 'Dashboard'    },
+  { to: '/proyectos',    icon: HardHat,   label: 'Proyectos'    },
+  { to: '/presupuestos', icon: Wallet,    label: 'Presupuestos' },
 ]
 
 const adminItems = [

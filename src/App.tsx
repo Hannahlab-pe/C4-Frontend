@@ -15,6 +15,8 @@ import NormativasAdminPage from './pages/NormativasAdminPage'
 import ProyectoConfigPage from './pages/ProyectoConfigPage'
 import EquipoPage from './pages/EquipoPage'
 import LogisticaPage from './pages/LogisticaPage'
+import PresupuestosPage from './pages/PresupuestosPage'
+import ProyectoPresupuestoPage from './pages/ProyectoPresupuestoPage'
 import { useAuthStore } from './store/authStore'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -37,6 +39,7 @@ export default function App() {
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="proyectos" element={<ProyectosPage />} />
+        <Route path="presupuestos" element={<PresupuestosPage />} />
         <Route path="base-conocimiento" element={<KnowledgeBasePage />} />
         <Route path="normativas" element={<NormativasAdminPage />} />
 
@@ -48,6 +51,7 @@ export default function App() {
           <Route path="cronograma-obra" element={<CronogramaObraPage />} />
           <Route path="equipo" element={<EquipoPage />} />
           <Route path="logistica" element={<LogisticaPage />} />
+          <Route path="presupuesto" element={<ProyectoPresupuestoPage />} />
           <Route path="configuracion" element={<ProyectoConfigPage />} />
           <Route path=":fase" element={<ProyectoFasePage />} />
           <Route path=":fase/:etapa" element={<EtapaDetallePage />} />

@@ -4,7 +4,8 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import {
   Send, Mic, Paperclip, Sparkles, Loader2,
-  CheckCircle2, Download, FileText, X, Plus, Trash2, Map, Volume2, VolumeX, Maximize2, Minimize2,
+  CheckCircle2, Download, FileText, FileSpreadsheet, X, Plus, Trash2, Map, Volume2, VolumeX, Maximize2, Minimize2,
+  ShieldAlert, Check,
 } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 import { useChatStore } from '../store/chatStore'
@@ -13,6 +14,23 @@ import { API_BASE, API_HOST } from '../lib/config'
 interface Props {
   proyectoId: string
 }
+
+// Preguntas sugeridas del carrusel (contextuales según el módulo que se está viendo)
+const SUGERENCIAS_PRESUPUESTO = [
+  'Revisa mi presupuesto y dame tu diagnóstico',
+  'Genérame el Excel del presupuesto',
+  '¿De dónde sale el costo del concreto en columnas? ¿Es razonable?',
+  '¿Por qué Estructuras pesa tanto?',
+  'Ármame un borrador de APU para tarrajeo de muros',
+  '¿Qué le falta a mi presupuesto?',
+  'Valida el precio del cemento contra el mercado',
+]
+const SUGERENCIAS_GENERAL = [
+  '¿Qué puedo construir en mi terreno?',
+  'Genera el análisis de pre-inversión',
+  'Revisa el presupuesto de la obra',
+  '¿Cómo va el avance del proyecto?',
+]
 
 export default function ChatPanel({ proyectoId }: Props) {
   const token = useAuthStore((s) => s.token)
@@ -25,6 +43,9 @@ export default function ChatPanel({ proyectoId }: Props) {
   const steps = useChatStore((s) => s.steps)
   const cargarSesion = useChatStore((s) => s.cargarSesion)
   const enviar = useChatStore((s) => s.enviar)
+  const pendiente = useChatStore((s) => s.pendiente)
+  const confirmar = useChatStore((s) => s.confirmar)
+  const cancelar = useChatStore((s) => s.cancelar)
   const setOpen = useChatStore((s) => s.setOpen)
   const expanded = useChatStore((s) => s.expanded)
   const toggleExpanded = useChatStore((s) => s.toggleExpanded)
@@ -182,6 +203,14 @@ export default function ChatPanel({ proyectoId }: Props) {
     enviar(userMsg, adjunto, faseActual)
   }
 
+  // Enviar una pregunta sugerida del carrusel directamente
+  function enviarTexto(texto: string) {
+    if (sending) return
+    const m = pathname.match(/\/panel\/(demolicion|excavacion|construccion|acabados|administracion)/)
+    enviar(texto, undefined, m?.[1])
+  }
+  const sugerencias = pathname.includes('/presupuesto') ? SUGERENCIAS_PRESUPUESTO : SUGERENCIAS_GENERAL
+
   return (
     <div className="flex flex-col h-full bg-white border-l border-slate-200">
 
@@ -305,6 +334,30 @@ export default function ChatPanel({ proyectoId }: Props) {
               Descargar plano DXF · ZwCAD / AutoCAD
             </button>
           </div>
+        ) : msg.rol === 'excel' ? (
+          <div key={msg.id} className="flex justify-start">
+            <div className="w-6 h-6 rounded-lg bg-emerald-600 flex items-center justify-center shrink-0 mr-2 mt-0.5">
+              <FileSpreadsheet className="w-3 h-3 text-white" />
+            </div>
+            <button
+              onClick={() => {
+                if (!token) return
+                fetch(`${API_HOST}${msg.contenido}`, { headers })
+                  .then((r) => r.blob())
+                  .then((blob) => {
+                    const url = URL.createObjectURL(blob)
+                    const a = document.createElement('a')
+                    a.href = url; a.download = 'presupuesto.xlsx'
+                    document.body.appendChild(a); a.click()
+                    document.body.removeChild(a); URL.revokeObjectURL(url)
+                  })
+              }}
+              className="flex items-center gap-2 bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-50 rounded-2xl rounded-bl-sm shadow-sm px-3 py-2.5 text-sm font-medium transition-colors"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Descargar Excel del presupuesto
+            </button>
+          </div>
         ) : (
           <div key={msg.id} className={`flex ${msg.rol === 'user' ? 'justify-end' : 'justify-start'}`}>
             {msg.rol === 'assistant' && (
@@ -370,6 +423,48 @@ export default function ChatPanel({ proyectoId }: Props) {
           </div>
         ))}
 
+        {/* Gate de confirmación: la IA propone escribir → nada se guarda hasta que el usuario confirme */}
+        {pendiente && (
+          <div className="flex justify-start">
+            <div className="w-6 h-6 rounded-lg bg-amber-500 flex items-center justify-center shrink-0 mr-2 mt-0.5">
+              <ShieldAlert className="w-3 h-3 text-white" />
+            </div>
+            <div className="max-w-[90%] bg-amber-50 border border-amber-200 rounded-2xl rounded-bl-sm shadow-sm px-3.5 py-3 space-y-2.5">
+              <p className="text-xs font-bold text-amber-800 uppercase tracking-wide">Confirmación requerida</p>
+              <p className="text-xs text-slate-600">
+                El asistente quiere <strong>guardar cambios</strong> en tu proyecto. No se ejecuta nada hasta que lo confirmes.
+              </p>
+              <div className="space-y-1.5">
+                {pendiente.acciones.filter((a) => a.esEscritura).map((a, i) => (
+                  <div key={i} className="flex items-start gap-2 bg-white border border-amber-100 rounded-lg px-2.5 py-1.5">
+                    <Check className="w-3 h-3 text-amber-600 mt-0.5 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-slate-700 leading-snug first-letter:uppercase">{a.descripcion}</p>
+                      <p className="text-[10px] text-slate-400">{a.modulo} · {a.tool}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="flex items-center gap-2 pt-0.5">
+                <button
+                  onClick={() => confirmar()}
+                  disabled={sending}
+                  className="flex items-center gap-1.5 bg-green-600 hover:bg-green-500 disabled:opacity-40 text-white text-xs font-semibold rounded-lg px-3 py-1.5 transition-colors"
+                >
+                  <Check className="w-3.5 h-3.5" /> Confirmar y ejecutar
+                </button>
+                <button
+                  onClick={() => cancelar()}
+                  disabled={sending}
+                  className="flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-40 text-slate-600 text-xs font-semibold rounded-lg px-3 py-1.5 transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" /> Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div ref={bottomRef} />
       </div>
 
@@ -407,6 +502,20 @@ export default function ChatPanel({ proyectoId }: Props) {
             ))}
           </div>
         )}
+      </div>
+
+      {/* Preguntas sugeridas (carrusel) */}
+      <div className="border-t border-slate-100 bg-white px-4 pt-2.5 pb-1 flex gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden">
+        {sugerencias.map((s, i) => (
+          <button
+            key={i}
+            onClick={() => enviarTexto(s)}
+            disabled={sending}
+            className="shrink-0 text-xs text-slate-600 bg-slate-50 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 border border-slate-200 rounded-full px-3 py-1.5 transition-colors whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {s}
+          </button>
+        ))}
       </div>
 
       {/* Input */}
