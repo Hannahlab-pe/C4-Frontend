@@ -108,7 +108,7 @@ export default function PresupuestosTab({ proyectoId: fixed }: { proyectoId?: st
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {presupuestos.map((p) => {
-            const meta = TIPO_PRESUP_META[p.tipo]
+            const meta = TIPO_PRESUP_META[p.tipo] ?? { label: p.tipo, badge: 'bg-slate-100 text-slate-600 border-slate-200' }
             return (
               <button key={p.id} onClick={() => setAbierto(p.id)}
                 className="group relative flex flex-col text-left bg-white rounded-2xl border border-slate-200 p-5 shadow-sm hover:-translate-y-0.5 hover:shadow-lg hover:shadow-slate-200/60 hover:border-slate-300 transition-all duration-200">

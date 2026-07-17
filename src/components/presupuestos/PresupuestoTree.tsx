@@ -85,7 +85,7 @@ export default function PresupuestoTree({ presupuestoId, onBack }: { presupuesto
   if (!arbol) return <p className="text-sm text-slate-400 py-12 text-center">No se pudo cargar el presupuesto.</p>
 
   const p = arbol.presupuesto
-  const meta = TIPO_PRESUP_META[p.tipo]
+  const meta = TIPO_PRESUP_META[p.tipo] ?? { label: p.tipo, badge: 'bg-slate-100 text-slate-600 border-slate-200' }
 
   return (
     <div className="space-y-4">

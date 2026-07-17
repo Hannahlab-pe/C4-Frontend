@@ -4,7 +4,7 @@ import api from './api'
 export type TipoRecurso = 'MO' | 'MAT' | 'EQP' | 'SUB'
 export type ClaseApu = TipoRecurso | 'PARTIDA'
 export type TipoItem = 'titulo' | 'partida'
-export type TipoPresupuesto = 'meta' | 'venta' | 'linea_base'
+export type TipoPresupuesto = 'meta' | 'venta' | 'linea_base' | 'estimado_ia'
 
 export interface Recurso {
   id: string
@@ -123,9 +123,10 @@ export const TIPO_RECURSO_META: Record<TipoRecurso, { label: string; badge: stri
 }
 
 export const TIPO_PRESUP_META: Record<TipoPresupuesto, { label: string; badge: string }> = {
-  meta:       { label: 'Meta',       badge: 'bg-blue-50 text-blue-700 border-blue-200' },
-  venta:      { label: 'Venta',      badge: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  linea_base: { label: 'Línea Base', badge: 'bg-slate-200 text-slate-700 border-slate-300' },
+  meta:        { label: 'Meta',        badge: 'bg-blue-50 text-blue-700 border-blue-200' },
+  venta:       { label: 'Venta',       badge: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  linea_base:  { label: 'Línea Base',  badge: 'bg-slate-200 text-slate-700 border-slate-300' },
+  estimado_ia: { label: 'Estimado IA', badge: 'bg-violet-50 text-violet-700 border-violet-200' },
 }
 
 // ── Formateo ────────────────────────────────────────────────────────────────
