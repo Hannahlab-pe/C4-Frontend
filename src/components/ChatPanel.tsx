@@ -358,6 +358,12 @@ export default function ChatPanel({ proyectoId }: Props) {
               Descargar Excel del presupuesto
             </button>
           </div>
+        ) : msg.rol === 'confirmacion' ? (
+          <div key={msg.id} className="flex justify-center my-0.5">
+            <div className="text-[11px] text-slate-500 bg-slate-100 border border-slate-200 rounded-full px-3 py-1 max-w-[90%] text-center first-letter:uppercase">
+              {msg.contenido}
+            </div>
+          </div>
         ) : (
           <div key={msg.id} className={`flex ${msg.rol === 'user' ? 'justify-end' : 'justify-start'}`}>
             {msg.rol === 'assistant' && (

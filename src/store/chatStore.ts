@@ -4,7 +4,7 @@ import { useAuthStore } from './authStore'
 
 export interface ChatMensaje {
   id: number
-  rol: 'user' | 'assistant' | 'pdf' | 'plano' | 'excel'
+  rol: 'user' | 'assistant' | 'pdf' | 'plano' | 'excel' | 'confirmacion'
   contenido: string
   streaming?: boolean
   adjuntos?: { nombre: string; tipo: string; base64: string }[]
@@ -209,12 +209,18 @@ export const useChatStore = create<ChatStore>((set, get) => {
       const { sending, proyectoId, pendiente } = get()
       if (sending || !proyectoId || !pendiente) return
       const token = useAuthStore.getState().token
-      const assistantId = Date.now() + 1
+      const label = pendiente.resumen || pendiente.acciones.map((a) => a.descripcion).filter(Boolean).join('; ') || 'la acción'
+      const confirmId = Date.now()
+      const assistantId = confirmId + 1
       set((s) => ({
         sending: true,
         pendiente: null,
         steps: [{ text: 'Ejecutando lo confirmado...', icon: 'think', done: false }],
-        mensajes: [...s.mensajes, { id: assistantId, rol: 'assistant', contenido: '', streaming: true }],
+        mensajes: [
+          ...s.mensajes,
+          { id: confirmId, rol: 'confirmacion', contenido: `✅ Confirmaste: ${label}` },
+          { id: assistantId, rol: 'assistant', contenido: '', streaming: true },
+        ],
       }))
       try {
         const res = await fetch(`${API_BASE}/chat/confirmar`, {
@@ -236,12 +242,18 @@ export const useChatStore = create<ChatStore>((set, get) => {
       const { sending, proyectoId, pendiente } = get()
       if (sending || !proyectoId || !pendiente) return
       const token = useAuthStore.getState().token
-      const assistantId = Date.now() + 1
+      const label = pendiente.resumen || pendiente.acciones.map((a) => a.descripcion).filter(Boolean).join('; ') || 'la acción'
+      const confirmId = Date.now()
+      const assistantId = confirmId + 1
       set((s) => ({
         sending: true,
         pendiente: null,
         steps: [],
-        mensajes: [...s.mensajes, { id: assistantId, rol: 'assistant', contenido: '', streaming: true }],
+        mensajes: [
+          ...s.mensajes,
+          { id: confirmId, rol: 'confirmacion', contenido: `🚫 Cancelaste: ${label}` },
+          { id: assistantId, rol: 'assistant', contenido: '', streaming: true },
+        ],
       }))
       try {
         const res = await fetch(`${API_BASE}/chat/cancelar`, {
