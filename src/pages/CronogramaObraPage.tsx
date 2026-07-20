@@ -319,12 +319,12 @@ export default function CronogramaObraPage() {
   return (
     <div className="h-full overflow-y-auto">
       {/* Header + KPIs */}
-      <div className="bg-gradient-to-r from-slate-800 to-slate-700 px-6 py-5 text-white">
+      <div className="bg-white border-b border-slate-200 px-6 py-5">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center"><CalendarRange className="w-5 h-5" /></div>
+          <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center"><CalendarRange className="w-5 h-5 text-slate-500" /></div>
           <div>
-            <h1 className="text-base font-bold">Cronograma de obra</h1>
-            <p className="text-xs text-slate-300">Gantt de ejecución — actividades por fase, avance y atrasos</p>
+            <h1 className="text-base font-bold text-slate-900 font-display">Cronograma de obra</h1>
+            <p className="text-xs text-slate-500">Gantt de ejecución — actividades por fase, avance y atrasos</p>
           </div>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
@@ -336,9 +336,9 @@ export default function CronogramaObraPage() {
             { label: 'Valor ganado', value: kpis.presupuesto ? `${soles(kpis.valorGanado)} · ${kpis.avanceCosto}%` : '—' },
             { label: 'Atrasadas', value: String(kpis.atrasadas), alerta: kpis.atrasadas > 0 },
           ].map((k) => (
-            <div key={k.label} className="bg-white/10 rounded-xl px-3 py-2.5">
-              <p className="text-[10px] text-slate-300 mb-0.5">{k.label}</p>
-              <p className={`text-sm font-bold ${(k as any).alerta ? 'text-red-300' : ''}`}>{k.value}</p>
+            <div key={k.label} className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5">
+              <p className="text-[10px] text-slate-400 mb-0.5">{k.label}</p>
+              <p className={`text-sm font-bold ${(k as any).alerta ? 'text-red-600' : 'text-slate-900'}`}>{k.value}</p>
             </div>
           ))}
         </div>

@@ -12,11 +12,12 @@ export default function DashboardLayout() {
   const transitionKey = panelBase ? panelBase[1] : pathname
 
   return (
-    <div className="flex h-dvh bg-slate-100 overflow-hidden">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header />
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+    // Topbar oscuro a todo el ancho arriba; debajo la fila [sidebar claro | contenido]
+    <div className="flex flex-col h-dvh bg-slate-100 overflow-hidden">
+      <Header />
+      <div className="flex-1 flex overflow-hidden min-h-0">
+        <Sidebar />
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 min-w-0">
           <div key={transitionKey} className="page-transition h-full">
             <Outlet />
           </div>

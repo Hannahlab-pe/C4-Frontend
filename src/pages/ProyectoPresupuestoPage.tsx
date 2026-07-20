@@ -10,13 +10,12 @@ export default function ProyectoPresupuestoPage() {
   return (
     <div className="h-full overflow-y-auto">
       {/* Header azul noche (igual que los demás módulos del proyecto) */}
-      <div className="bg-linear-to-r from-slate-800 to-slate-700 px-6 py-4 md:py-5 text-white flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
-          <Wallet className="w-5 h-5" />
+      <div className="bg-white border-b border-slate-200 px-6 py-4 md:py-5 flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
+          <Wallet className="w-5 h-5 text-slate-500" />
         </div>
         <div>
-          <h2 className="text-base font-bold">Presupuesto de la obra</h2>
-          <p className="text-xs text-slate-300 mt-0.5">
+          <p className="text-xs text-slate-500">
             Arma y controla los presupuestos de este proyecto. El catálogo de recursos y APU está en el módulo Presupuestos.
           </p>
         </div>

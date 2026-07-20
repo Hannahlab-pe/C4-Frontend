@@ -1,11 +1,41 @@
 @import "tailwindcss";
 
+/* Fuente principal de la app (cargada en index.html) */
+@theme {
+  --font-sans: "Manrope", "Inter", system-ui, sans-serif;
+  --font-display: "Outfit", "Manrope", system-ui, sans-serif;
+}
 
 body {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: "Manrope", "Inter", system-ui, sans-serif;
   background: #f1f5f9;
   color: #0f172a;
   -webkit-font-smoothing: antialiased;
+}
+
+/* ── Design tokens C4 ─────────────────────────── */
+:root {
+  --c4-topbar: #0b1220;       /* topbar oscuro a todo el ancho */
+  --c4-accent: #2563eb;       /* azul de marca (blue-600) */
+  --c4-accent-ink: #1d4ed8;   /* azul presionado */
+}
+
+/* Hero "blueprint" del dashboard: grilla técnica + glow de acento + grano sutil */
+.c4-hero-bp {
+  background:
+    radial-gradient(120% 130% at 100% 0%, rgba(37, 99, 235, 0.28), transparent 52%),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.032) 0 1px, transparent 1px 30px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.032) 0 1px, transparent 1px 30px),
+    #0b1220;
+}
+.c4-hero-bp::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.06;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 #root { width: 100%; height: 100dvh; overflow-x: hidden; }
@@ -48,3 +78,9 @@ body {
 .c4-reveal {
   animation: revealUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
+
+/* Entrada escalonada de tarjetas (KPIs / resultados del análisis) */
+.c4-stagger > * { animation: revealUp 0.45s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.c4-stagger > *:nth-child(2) { animation-delay: 0.06s; }
+.c4-stagger > *:nth-child(3) { animation-delay: 0.12s; }
+.c4-stagger > *:nth-child(4) { animation-delay: 0.18s; }

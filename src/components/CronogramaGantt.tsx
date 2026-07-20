@@ -1,6 +1,7 @@
 import { CalendarRange, Flag, Maximize2 } from 'lucide-react'
 import type { CabidaMin, FinancieroMin } from '../lib/cronograma'
 import { FASE_COLOR, generarCronograma, etiquetaSemana, ticksEje } from '../lib/cronograma'
+import InfoTip from './InfoTip'
 
 const LABEL_W = 42 // % del ancho para la columna de nombres
 const TRACK_W = 100 - LABEL_W
@@ -18,6 +19,11 @@ export default function CronogramaGantt({ cabida, financiero, inicio = null, onA
         <div className="flex items-center gap-2">
           <CalendarRange className="w-4 h-4 text-slate-400" />
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Cronograma del Proyecto</p>
+          <InfoTip title="¿Cómo se estima?">
+            <p>Estimación <b className="text-slate-700">paramétrica</b> del motor: los meses de obra salen del área construida (~280 m²/mes).</p>
+            <p>Las fases (pre-obra, cimentación, casco, acabados, ventas, cierre) se distribuyen con duraciones típicas de Lima.</p>
+            <p>Es un estimado para arrancar — ábrelo en el Gantt para ajustar fechas y frentes reales.</p>
+          </InfoTip>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full">

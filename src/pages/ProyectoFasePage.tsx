@@ -801,23 +801,23 @@ export default function ProyectoFasePage() {
         accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" onChange={onArchivoElegido} />
 
       {/* ── Header azul noche (igual que el Cronograma) ── */}
-      <div className="bg-linear-to-r from-slate-800 to-slate-700 px-4 md:px-6 py-4 md:py-5 text-white">
+      <div className="bg-white border-b border-slate-200 px-4 md:px-6 py-4 md:py-5">
         <div className="flex items-center gap-3 md:gap-4 mb-4">
-          <div className="relative w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
-            <Icon className="w-5 h-5 text-white" />
-            <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-slate-800 ${config.accent}`} />
+          <div className="relative w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
+            <Icon className="w-5 h-5 text-slate-500" />
+            <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${config.accent}`} />
           </div>
           <div className="flex-1 min-w-0">
-            <h1 className="text-base font-bold leading-tight truncate">{config.nombre}</h1>
-            <p className="text-xs text-slate-300 mt-0.5 truncate">{config.descripcion}</p>
+            <h1 className="text-base font-bold leading-tight truncate text-slate-900 font-display">{config.nombre}</h1>
+            <p className="text-xs text-slate-500 mt-0.5 truncate">{config.descripcion}</p>
           </div>
           <div className="flex items-center gap-2 md:gap-3 shrink-0">
             <div className="text-right">
-              <p className="text-[10px] text-slate-300 uppercase tracking-wider whitespace-nowrap">Avance<span className="hidden sm:inline"> de fase</span></p>
-              <p className="text-sm font-bold">{avanceGlobal}%</p>
+              <p className="text-[10px] text-slate-500 uppercase tracking-wider whitespace-nowrap">Avance<span className="hidden sm:inline"> de fase</span></p>
+              <p className="text-sm font-bold text-slate-900">{avanceGlobal}%</p>
             </div>
-            <div className="hidden sm:block w-20 md:w-28 bg-white/20 rounded-full h-1.5">
-              <div className="bg-white h-1.5 rounded-full transition-all duration-500" style={{ width: `${avanceGlobal}%` }} />
+            <div className="hidden sm:block w-20 md:w-28 bg-slate-200 rounded-full h-1.5">
+              <div className="bg-blue-600 h-1.5 rounded-full transition-all duration-500" style={{ width: `${avanceGlobal}%` }} />
             </div>
           </div>
         </div>
@@ -826,9 +826,9 @@ export default function ProyectoFasePage() {
         <div className="grid grid-cols-3 gap-2 md:gap-3 md:[grid-template-columns:var(--kpi-cols)]"
           style={{ ['--kpi-cols' as any]: `repeat(${kpis.length}, minmax(0, 1fr))` }}>
           {kpis.map((k) => (
-            <div key={k.label} className="bg-white/10 rounded-xl px-3 py-2.5">
-              <p className="text-[10px] text-slate-300 uppercase tracking-wider mb-0.5 truncate">{k.label}</p>
-              <p className="text-sm font-bold truncate" title={k.value}>{k.value}</p>
+            <div key={k.label} className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5">
+              <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-0.5 truncate">{k.label}</p>
+              <p className="text-sm font-bold truncate text-slate-900" title={k.value}>{k.value}</p>
             </div>
           ))}
         </div>

@@ -3,10 +3,15 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   Layers, Building, TrendingUp, Loader2, BarChart2,
   ConstructionIcon, CheckCircle2, AlertTriangle, XCircle, CalendarRange,
-  FileText, Activity, Flag,
+  FileText, Activity, Flag, RefreshCw, Boxes,
 } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 import FinancieroPanel from '../components/FinancieroPanel'
+import FormularioAnalisis from '../components/FormularioAnalisis'
+import ComparadorSistema from '../components/ComparadorSistema'
+import PrecioMaximoTerreno from '../components/PrecioMaximoTerreno'
+import InfoTip from '../components/InfoTip'
+import AppDialog from '../components/AppDialog'
 import CronogramaGantt from '../components/CronogramaGantt'
 import AvanceObra from '../components/AvanceObra'
 import type { AvanceData } from '../components/AvanceObra'
@@ -39,7 +44,7 @@ interface AnalisisEstructural {
   lado_columna_cm: number; concreto_total_m3: number; acero_total_ton: number
 }
 interface AnalisisFinanciero {
-  tir_anual_pct: number; van_usd: number; margen_neto_pct: number
+  tir_anual_pct: number; irr_anual_pct: number; costo_construccion_m2: number; van_usd: number; margen_neto_pct: number
   payback_meses: number; utilidad_neta_usd: number; utilidad_bruta_usd: number
   impuestos_estimados_usd: number; ingreso_total_usd: number
   costo_total_usd: number; costo_construccion_usd: number; costo_terreno_usd: number
@@ -54,13 +59,14 @@ interface AnalisisFinanciero {
 }
 
 const TABS = [
-  { key: 'cabida',     label: 'Cabida',      icon: Layers },
-  { key: 'estructura', label: 'Estructura',  icon: Building },
-  { key: 'financiero', label: 'Financiero',  icon: TrendingUp },
-  { key: 'cronograma', label: 'Cronograma',  icon: CalendarRange },
+  { key: 'cabida',     label: 'Cabida',       icon: Layers },
+  { key: 'estructura', label: 'Estructura',   icon: Building },
+  { key: 'financiero', label: 'Financiero',   icon: TrendingUp },
+  { key: 'prefab',     label: 'Prefabricado', icon: Boxes },
+  { key: 'cronograma', label: 'Cronograma',   icon: CalendarRange },
 ]
 
-function fmt(n: number, d = 0) { return n.toLocaleString('es-PE', { maximumFractionDigits: d }) }
+function fmt(n?: number, d = 0) { return (n ?? 0).toLocaleString('es-PE', { maximumFractionDigits: d }) }
 const usd = (n?: number) =>
   n == null ? '-' : n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(2)}M` : `$${(n / 1_000).toFixed(0)}K`
 const usdFull = (n?: number) =>
@@ -122,6 +128,7 @@ export default function AnalisisPage() {
     cabida?: AnalisisCabida; estructura?: AnalisisEstructural; financiero?: AnalisisFinanciero; distrito?: string
   } | null>(null)
   const [seguimiento, setSeguimiento] = useState<Seguimiento>({})
+  const [mostrarForm, setMostrarForm] = useState(false)
   const hidratado = useRef(false)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -149,6 +156,19 @@ export default function AnalisisPage() {
     }, 700)
   }, [id, token, seguimiento])
 
+  const handleGenerado = (nuevo: { cabida?: any; estructura?: any; financiero?: any; distrito?: string }) => {
+    setData((prev) => ({
+      ...(prev ?? {}),
+      cabida: nuevo.cabida,
+      estructura: nuevo.estructura,
+      financiero: nuevo.financiero,
+      distrito: nuevo.distrito ?? prev?.distrito,
+    }))
+    setMostrarForm(false)
+    setFase('previo')
+    setActive('cabida')
+  }
+
   if (loading) return (
     <div className="h-full flex items-center justify-center gap-3 text-slate-400">
       <Loader2 className="w-5 h-5 animate-spin" />
@@ -159,13 +179,16 @@ export default function AnalisisPage() {
   const tieneData = data?.cabida || data?.estructura || data?.financiero
 
   if (!tieneData) return (
-    <div className="h-full flex flex-col items-center justify-center gap-4 text-center p-8">
-      <BarChart2 className="w-12 h-12 text-slate-200" />
-      <div>
-        <p className="text-slate-600 font-medium">Sin análisis generado</p>
-        <p className="text-sm text-slate-400 mt-1">
-          Abre el Asistente C4 e ingresa los datos de un terreno para generar el análisis de pre-inversión.
-        </p>
+    <div className="h-full overflow-y-auto p-6">
+      <div className="max-w-lg mx-auto mt-4 md:mt-10">
+        <div className="text-center mb-5">
+          <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-3">
+            <BarChart2 className="w-6 h-6 text-slate-400" />
+          </div>
+          <p className="font-display text-lg font-bold text-slate-800">Aún no hay análisis</p>
+          <p className="text-sm text-slate-400 mt-1">Evalúa el terreno con el formulario, o pídeselo al Asistente C4.</p>
+        </div>
+        {id && <FormularioAnalisis proyectoId={id} onGenerado={handleGenerado} />}
       </div>
     </div>
   )
@@ -183,16 +206,33 @@ export default function AnalisisPage() {
     <div className="h-full overflow-y-auto">
 
       {/* Header azul noche (igual que el Cronograma) */}
-      <div className="bg-linear-to-r from-slate-800 to-slate-700 px-6 py-4 md:py-5 text-white">
+      <div className="bg-white border-b border-slate-200 px-6 py-4 md:py-5">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
-            <h2 className="text-base font-bold">{FASE_TITULO[fase]}</h2>
-            {data?.distrito && <p className="text-xs text-slate-300 mt-0.5">{data.distrito}</p>}
+            <h2 className="text-base font-bold text-slate-900 font-display">{FASE_TITULO[fase]}</h2>
+            {data?.distrito && <p className="text-xs text-slate-500 mt-0.5">{data.distrito}</p>}
           </div>
-          {fase === 'previo' && veredicto && (
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold ${veredicto.cls}`}>
-              <veredicto.Icon className="w-4 h-4" />
-              {veredicto.txt}
+          {fase === 'previo' && (
+            <div className="flex items-center gap-2.5 flex-wrap">
+              {veredicto && (
+                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold ${veredicto.cls}`}>
+                  <veredicto.Icon className="w-4 h-4" />
+                  {veredicto.txt}
+                </div>
+              )}
+              {f && (
+                <InfoTip title="¿Cómo se decide?">
+                  <p>El veredicto sale de la <b className="text-slate-700">TIR anual</b>: <b>≥18%</b> viable · <b>12–18%</b> ajustado · <b>&lt;12%</b> no rentable.</p>
+                  <p>Aquí la TIR es <b className="text-slate-700">{(f.tir_anual_pct ?? 0).toFixed(1)}%</b> → <b>{veredicto?.txt.toLowerCase()}</b>. La TIR mide cuánto rinde tu plata al año; se compara con el costo de capital (~12%).</p>
+                  <p>Para mejorarla: sube el precio de venta/m², baja el costo del terreno, o ajusta la mezcla de tipologías.</p>
+                </InfoTip>
+              )}
+              <button
+                onClick={() => setMostrarForm(true)}
+                className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 border border-slate-200 rounded-lg px-3 py-1.5 hover:bg-slate-50 transition-colors"
+              >
+                <RefreshCw className="w-3.5 h-3.5" /> Recalcular
+              </button>
             </div>
           )}
         </div>
@@ -220,7 +260,7 @@ export default function AnalisisPage() {
 
       {/* Resumen ejecutivo — KPIs siempre visibles */}
       {f && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 c4-stagger">
           <MiniKpi label="TIR Anual" value={`${(f.tir_anual_pct ?? 0).toFixed(1)}%`} sub="Retorno anualizado" color={tirColor} />
           <MiniKpi label="VAN (12%)" value={usd(f.van_usd)} sub="Valor actual neto" color={vanColor} />
           <MiniKpi label="Margen neto" value={`${(f.margen_neto_pct ?? 0).toFixed(1)}%`} sub={`Utilidad ${usd(f.utilidad_neta_usd)}`} />
@@ -246,9 +286,17 @@ export default function AnalisisPage() {
 
       {/* ── CABIDA ── */}
       {active === 'cabida' && c && (
-        <div className="grid lg:grid-cols-2 gap-4 items-start">
+        <div className="grid lg:grid-cols-2 gap-4 items-start c4-reveal">
           <div className="bg-white rounded-2xl border border-slate-200 p-5">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Cabida Arquitectónica</p>
+            <div className="flex items-center gap-1.5 mb-3">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Cabida Arquitectónica</p>
+              <InfoTip title="¿De dónde salen estos números?">
+                <p><b className="text-slate-700">Planta libre</b> = (frente − 2 retiros laterales) × (fondo − retiro frontal − posterior).</p>
+                <p><b className="text-slate-700">Pisos</b> = el menor entre el máximo del distrito y los que permite el CUS (área × CUS ÷ planta libre).</p>
+                <p><b className="text-slate-700">Área vendible</b> ≈ 78% de la construida (el resto es muros, ductos y circulación).</p>
+                <p><b className="text-slate-700">Departamentos</b> = área vendible ÷ área promedio por tipología. Todo con la normativa del distrito.</p>
+              </InfoTip>
+            </div>
             <Row label="Área del terreno"       value={`${fmt(c.area_terreno)} m²`} />
             <Row label="Planta libre"           value={`${fmt(c.planta_libre)} m²`} />
             <Row label="Pisos de vivienda"      value={String(c.pisos_vivienda)} highlight />
@@ -268,6 +316,10 @@ export default function AnalisisPage() {
               <div className="flex items-center gap-2 mb-3">
                 <ConstructionIcon className="w-4 h-4 text-slate-400" />
                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Grúa Torre Recomendada</p>
+                <InfoTip title="¿Cómo se elige?">
+                  <p>Se selecciona por el número de pisos (tabla de grúas torre usadas en Lima). El <b className="text-slate-700">radio de pluma</b> debe cubrir todo el terreno.</p>
+                  <p>El alquiler estimado escala con la capacidad. La posición óptima de la base se grafica en el plano DXF (Hoja 0).</p>
+                </InfoTip>
               </div>
               <Row label="Modelo"           value={grua.modelo} highlight />
               <Row label="Radio de pluma"   value={`${grua.radio} m`} />
@@ -285,8 +337,15 @@ export default function AnalisisPage() {
 
       {/* ── ESTRUCTURA ── */}
       {active === 'estructura' && data?.estructura && (
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 max-w-lg">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Predimensionamiento Estructural</p>
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 max-w-lg c4-reveal">
+          <div className="flex items-center gap-1.5 mb-3">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Predimensionamiento Estructural</p>
+            <InfoTip title="¿Cómo se predimensiona?">
+              <p>Estimación empírica <b className="text-slate-700">pre-ETABS</b> (referencial, no es el cálculo estructural final).</p>
+              <p>Vigas: peralte = luz/12 · Losa aligerada: h = luz/30 · Columnas: por carga axial (P ÷ 0.45·f'c).</p>
+              <p>Concreto f'c=210, acero fy=4200 con cuantías típicas. Sirve para estimar volúmenes de concreto y acero.</p>
+            </InfoTip>
+          </div>
           <Row label="Vigas principales"  value={`${data.estructura.base_viga_cm} × ${data.estructura.peralte_viga_cm} cm`} highlight />
           <Row label="Losa aligerada"     value={`h = ${data.estructura.espesor_losa_cm} cm`} highlight />
           <Row label="Columnas"           value={`${data.estructura.lado_columna_cm} × ${data.estructura.lado_columna_cm} cm`} highlight />
@@ -298,7 +357,13 @@ export default function AnalisisPage() {
 
       {/* ── FINANCIERO ── */}
       {active === 'financiero' && f && (
-        <div className="grid lg:grid-cols-2 gap-4 items-start max-w-5xl">
+        <div className="grid lg:grid-cols-2 gap-4 items-start c4-reveal">
+          {/* Precio máximo de terreno (valor residual) — la decisión #1 del desarrollador */}
+          {id && (
+            <div className="lg:col-span-2">
+              <PrecioMaximoTerreno proyectoId={id} precioActual={f.costo_terreno_usd} />
+            </div>
+          )}
           {/* Gráficos + desglose */}
           <div className="lg:col-span-2">
             <FinancieroPanel financiero={f as any} />
@@ -306,11 +371,20 @@ export default function AnalisisPage() {
 
           {/* Resultados detallados */}
           <div className="bg-white rounded-2xl border border-slate-200 p-5">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Resultados</p>
+            <div className="flex items-center gap-1.5 mb-3">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Resultados</p>
+              <InfoTip title="¿Cómo se calcula el retorno?">
+                <p><b className="text-slate-700">Ingreso</b> = área vendible × precio/m². <b className="text-slate-700">Costo de construcción</b> = USD/m² por altura y zona (Revista Costos 2026) × área construida.</p>
+                <p>Se suman terreno, licencias, supervisión, marketing, corretaje, financiamiento (banco 11% sobre construcción) e impuestos (~15%).</p>
+                <p><b className="text-slate-700">TIR</b> = ROI anualizado (estable, sobre el costo total). <b className="text-slate-700">IRR del flujo</b> = tasa real del flujo de caja (aprovecha el timing y el apalancamiento — suele ser mayor). Mostramos las dos para no esconder de dónde sale cada una. <b className="text-slate-700">VAN</b> descuenta el flujo al 12%.</p>
+              </InfoTip>
+            </div>
             <Row label="Ingreso total ventas"  value={usdFull(f.ingreso_total_usd)} highlight />
             <Row label="Precio venta / m²"     value={`$${fmt(f.precio_venta_usd_m2)}`} />
+            <Row label="IRR del flujo (real)"  value={(f.irr_anual_pct ?? 0) > 0 ? `${f.irr_anual_pct.toFixed(1)}%` : 'n/d'} highlight />
             <Row label="Costo total"           value={usdFull(f.costo_total_usd)} />
-            <Row label="Costo / m² construido" value={`$${fmt(f.costo_usd_m2_construido)}`} />
+            <Row label="Costo construcción / m²" value={f.costo_construccion_m2 != null ? `$${fmt(f.costo_construccion_m2)}` : '—'} />
+            <Row label="Costo / m² (todo incluido)" value={`$${fmt(f.costo_usd_m2_construido)}`} />
             <Row label="Utilidad bruta"        value={usdFull(f.utilidad_bruta_usd)} />
             <Row label="Impuestos (~15%)"      value={usdFull(f.impuestos_estimados_usd)} />
             <Row label="Utilidad neta"         value={usdFull(f.utilidad_neta_usd)} highlight />
@@ -343,9 +417,16 @@ export default function AnalisisPage() {
         </div>
       )}
 
+      {/* ── PREFABRICADO (prelosa Betondecken vs tradicional) ── */}
+      {active === 'prefab' && c && f && id && (
+        <div className="c4-reveal">
+          <ComparadorSistema proyectoId={id} />
+        </div>
+      )}
+
       {/* ── CRONOGRAMA ── */}
       {active === 'cronograma' && c && f && (
-        <div className="max-w-5xl">
+        <div className="c4-reveal">
           <CronogramaGantt cabida={c} financiero={f} onAbrir={() => navigate('../cronograma')} />
         </div>
       )}
@@ -354,6 +435,7 @@ export default function AnalisisPage() {
       {active === 'cabida'     && !data?.cabida     && <p className="text-sm text-slate-400">Datos de cabida no disponibles.</p>}
       {active === 'estructura' && !data?.estructura && <p className="text-sm text-slate-400">Datos estructurales no disponibles.</p>}
       {active === 'financiero' && !data?.financiero && <p className="text-sm text-slate-400">Datos financieros no disponibles.</p>}
+      {active === 'prefab'     && (!data?.cabida || !data?.financiero) && <p className="text-sm text-slate-400">Ejecuta un análisis completo para comparar sistemas constructivos.</p>}
       {active === 'cronograma' && (!data?.cabida || !data?.financiero) && <p className="text-sm text-slate-400">Ejecuta un análisis completo para ver el cronograma.</p>}
 
       </>)}
@@ -376,6 +458,18 @@ export default function AnalisisPage() {
           : <p className="text-sm text-slate-400">Ejecuta el análisis de pre-inversión primero para habilitar el cierre de obra.</p>
       )}
       </div>
+
+      <AppDialog open={mostrarForm} onClose={() => setMostrarForm(false)} title="Recalcular análisis">
+        {id && (
+          <FormularioAnalisis
+            proyectoId={id}
+            distritoInicial={data?.distrito}
+            onGenerado={handleGenerado}
+            onCancelar={() => setMostrarForm(false)}
+            embedded
+          />
+        )}
+      </AppDialog>
     </div>
   )
 }

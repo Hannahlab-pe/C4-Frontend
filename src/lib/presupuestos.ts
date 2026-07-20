@@ -114,6 +114,36 @@ export interface ArbolResponse {
   porGenerico: Record<TipoRecurso, number>
 }
 
+// ── Valorizaciones (avance mensual para cobrar) ─────────────────────────────
+export interface ValorizacionResumen {
+  id: string
+  numero: number
+  periodo: string
+  estado: string
+  createdAt?: string
+}
+export interface ValorizacionItemCalc {
+  id: string
+  parentId?: string | null
+  tipo: TipoItem
+  codigo: string
+  descripcion: string
+  orden: number
+  parcial: number
+  pctAvance: number | null
+  valorizadoAcum: number
+  valorizadoPeriodo: number
+}
+export interface ValorizacionDetalle {
+  valorizacion: { id: string; numero: number; periodo: string; estado: string }
+  presupuesto: { id: string; nombre: string; tipo: TipoPresupuesto; costoDirecto: number; total: number }
+  items: ValorizacionItemCalc[]
+  totales: {
+    cd_periodo: number; gg_periodo: number; ut_periodo: number; igv_periodo: number; total_periodo: number
+    cd_acum: number; total_acum: number; avance_global_pct: number
+  }
+}
+
 // ── Etiquetas / colores por tipo de recurso ─────────────────────────────────
 export const TIPO_RECURSO_META: Record<TipoRecurso, { label: string; badge: string }> = {
   MO:  { label: 'Mano de obra', badge: 'bg-blue-50 text-blue-700 border-blue-200' },
@@ -187,4 +217,16 @@ export const presupuestosApi = {
     api.patch<PresupuestoItem>(`/presupuestos/items/${itemId}`, dto).then((r) => r.data),
   eliminarItem: (itemId: string) =>
     api.delete(`/presupuestos/items/${itemId}`).then((r) => r.data),
+
+  // Valorizaciones (avance mensual para cobrar)
+  listarValorizaciones: (presupuestoId: string) =>
+    api.get<ValorizacionResumen[]>(`/presupuestos/${presupuestoId}/valorizaciones`).then((r) => r.data),
+  crearValorizacion: (presupuestoId: string, periodo: string) =>
+    api.post<ValorizacionDetalle>(`/presupuestos/${presupuestoId}/valorizaciones`, { periodo }).then((r) => r.data),
+  getValorizacion: (valId: string) =>
+    api.get<ValorizacionDetalle>(`/presupuestos/valorizaciones/${valId}`).then((r) => r.data),
+  actualizarAvance: (valId: string, itemId: string, pct: number) =>
+    api.patch<ValorizacionDetalle>(`/presupuestos/valorizaciones/${valId}/avance`, { itemId, pct }).then((r) => r.data),
+  eliminarValorizacion: (valId: string) =>
+    api.delete(`/presupuestos/valorizaciones/${valId}`).then((r) => r.data),
 }
