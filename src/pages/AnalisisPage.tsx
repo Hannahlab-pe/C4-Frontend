@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useParams } from 'react-router-dom'
 import {
   Layers, Building, TrendingUp, Loader2, BarChart2,
-  ConstructionIcon, CheckCircle2, AlertTriangle, XCircle, CalendarRange,
-  FileText, Activity, Flag, RefreshCw, Boxes,
+  ConstructionIcon, CheckCircle2, AlertTriangle, XCircle,
+  RefreshCw, Boxes,
 } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 import FinancieroPanel from '../components/FinancieroPanel'
@@ -12,26 +12,7 @@ import ComparadorSistema from '../components/ComparadorSistema'
 import PrecioMaximoTerreno from '../components/PrecioMaximoTerreno'
 import InfoTip from '../components/InfoTip'
 import AppDialog from '../components/AppDialog'
-import CronogramaGantt from '../components/CronogramaGantt'
-import AvanceObra from '../components/AvanceObra'
-import type { AvanceData } from '../components/AvanceObra'
-import CierreObra from '../components/CierreObra'
-import type { CierreData } from '../components/CierreObra'
 import { API_BASE } from '../lib/config'
-
-type FaseProyecto = 'previo' | 'avance' | 'cierre'
-interface Seguimiento { avance?: AvanceData; cierre?: CierreData }
-
-const FASES = [
-  { key: 'previo', label: 'Pre-inversión',  icon: FileText },
-  { key: 'avance', label: 'Avance de obra', icon: Activity },
-  { key: 'cierre', label: 'Cierre',         icon: Flag },
-]
-const FASE_TITULO: Record<FaseProyecto, string> = {
-  previo: 'Análisis de Pre-inversión',
-  avance: 'Avance de Obra',
-  cierre: 'Cierre de Obra',
-}
 
 interface AnalisisCabida {
   area_terreno: number; planta_libre: number; pisos_vivienda: number
@@ -63,7 +44,6 @@ const TABS = [
   { key: 'estructura', label: 'Estructura',   icon: Building },
   { key: 'financiero', label: 'Financiero',   icon: TrendingUp },
   { key: 'prefab',     label: 'Prefabricado', icon: Boxes },
-  { key: 'cronograma', label: 'Cronograma',   icon: CalendarRange },
 ]
 
 function fmt(n?: number, d = 0) { return (n ?? 0).toLocaleString('es-PE', { maximumFractionDigits: d }) }
@@ -119,18 +99,13 @@ function precioGruaSoles(ton: number): string {
 
 export default function AnalisisPage() {
   const { id } = useParams()
-  const navigate = useNavigate()
   const token = useAuthStore((s) => s.token)
-  const [fase, setFase] = useState<FaseProyecto>('previo')
   const [active, setActive] = useState('cabida')
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<{
     cabida?: AnalisisCabida; estructura?: AnalisisEstructural; financiero?: AnalisisFinanciero; distrito?: string
   } | null>(null)
-  const [seguimiento, setSeguimiento] = useState<Seguimiento>({})
   const [mostrarForm, setMostrarForm] = useState(false)
-  const hidratado = useRef(false)
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     if (!id) return
@@ -138,23 +113,10 @@ export default function AnalisisPage() {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { setData(d); if (d?.seguimiento && typeof d.seguimiento === 'object') setSeguimiento(d.seguimiento) })
+      .then((d) => setData(d))
       .catch(() => setData(null))
-      .finally(() => { setLoading(false); hidratado.current = true })
+      .finally(() => setLoading(false))
   }, [id, token])
-
-  // Guardar seguimiento (debounced) en BD
-  useEffect(() => {
-    if (!id || !hidratado.current) return
-    if (saveTimer.current) clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(() => {
-      fetch(`${API_BASE}/chat/${id}/seguimiento`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(seguimiento),
-      }).catch(() => {})
-    }, 700)
-  }, [id, token, seguimiento])
 
   const handleGenerado = (nuevo: { cabida?: any; estructura?: any; financiero?: any; distrito?: string }) => {
     setData((prev) => ({
@@ -165,7 +127,6 @@ export default function AnalisisPage() {
       distrito: nuevo.distrito ?? prev?.distrito,
     }))
     setMostrarForm(false)
-    setFase('previo')
     setActive('cabida')
   }
 
@@ -209,11 +170,10 @@ export default function AnalisisPage() {
       <div className="bg-white border-b border-slate-200 px-6 py-4 md:py-5">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
-            <h2 className="text-base font-bold text-slate-900 font-display">{FASE_TITULO[fase]}</h2>
+            <h2 className="text-base font-bold text-slate-900 font-display">Análisis de Pre-inversión</h2>
             {data?.distrito && <p className="text-xs text-slate-500 mt-0.5">{data.distrito}</p>}
           </div>
-          {fase === 'previo' && (
-            <div className="flex items-center gap-2.5 flex-wrap">
+          <div className="flex items-center gap-2.5 flex-wrap">
               {veredicto && (
                 <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold ${veredicto.cls}`}>
                   <veredicto.Icon className="w-4 h-4" />
@@ -234,29 +194,10 @@ export default function AnalisisPage() {
                 <RefreshCw className="w-3.5 h-3.5" /> Recalcular
               </button>
             </div>
-          )}
         </div>
       </div>
 
       <div className="p-6 space-y-5">
-
-      {/* Switcher de fases del proyecto: cómo empezó / cómo va / cómo terminó */}
-      <div className="flex gap-1 bg-slate-100 rounded-xl p-1 w-fit">
-        {FASES.map(({ key, label, icon: Icon }) => (
-          <button
-            key={key}
-            onClick={() => setFase(key as FaseProyecto)}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
-              fase === key ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            <Icon className="w-3.5 h-3.5" /> {label}
-          </button>
-        ))}
-      </div>
-
-      {/* ════════════ FASE: PRE-INVERSIÓN (cómo empezó / lo proyectado) ════════════ */}
-      {fase === 'previo' && (<>
 
       {/* Resumen ejecutivo — KPIs siempre visibles */}
       {f && (
@@ -345,6 +286,7 @@ export default function AnalisisPage() {
               <p>Vigas: peralte = luz/12 · Losa aligerada: h = luz/30 · Columnas: por carga axial (P ÷ 0.45·f'c).</p>
               <p>Concreto f'c=210, acero fy=4200 con cuantías típicas. Sirve para estimar volúmenes de concreto y acero.</p>
             </InfoTip>
+            <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">Referencia</span>
           </div>
           <Row label="Vigas principales"  value={`${data.estructura.base_viga_cm} × ${data.estructura.peralte_viga_cm} cm`} highlight />
           <Row label="Losa aligerada"     value={`h = ${data.estructura.espesor_losa_cm} cm`} highlight />
@@ -424,39 +366,12 @@ export default function AnalisisPage() {
         </div>
       )}
 
-      {/* ── CRONOGRAMA ── */}
-      {active === 'cronograma' && c && f && (
-        <div className="c4-reveal">
-          <CronogramaGantt cabida={c} financiero={f} onAbrir={() => navigate('../cronograma')} />
-        </div>
-      )}
-
       {/* Empty states por tab */}
       {active === 'cabida'     && !data?.cabida     && <p className="text-sm text-slate-400">Datos de cabida no disponibles.</p>}
       {active === 'estructura' && !data?.estructura && <p className="text-sm text-slate-400">Datos estructurales no disponibles.</p>}
       {active === 'financiero' && !data?.financiero && <p className="text-sm text-slate-400">Datos financieros no disponibles.</p>}
       {active === 'prefab'     && (!data?.cabida || !data?.financiero) && <p className="text-sm text-slate-400">Ejecuta un análisis completo para comparar sistemas constructivos.</p>}
-      {active === 'cronograma' && (!data?.cabida || !data?.financiero) && <p className="text-sm text-slate-400">Ejecuta un análisis completo para ver el cronograma.</p>}
 
-      </>)}
-
-      {/* ════════════ FASE: AVANCE DE OBRA (cómo va) ════════════ */}
-      {fase === 'avance' && (
-        c && f
-          ? <AvanceObra cabida={c} financiero={f}
-              value={seguimiento.avance ?? {}}
-              onChange={(avance) => setSeguimiento((s) => ({ ...s, avance }))} />
-          : <p className="text-sm text-slate-400">Ejecuta el análisis de pre-inversión primero para habilitar el seguimiento de obra.</p>
-      )}
-
-      {/* ════════════ FASE: CIERRE (cómo terminó) ════════════ */}
-      {fase === 'cierre' && (
-        c && f
-          ? <CierreObra cabida={c} financiero={f}
-              value={seguimiento.cierre ?? {}}
-              onChange={(cierre) => setSeguimiento((s) => ({ ...s, cierre }))} />
-          : <p className="text-sm text-slate-400">Ejecuta el análisis de pre-inversión primero para habilitar el cierre de obra.</p>
-      )}
       </div>
 
       <AppDialog open={mostrarForm} onClose={() => setMostrarForm(false)} title="Recalcular análisis">

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Loader2, Plus, Trash2 } from 'lucide-react'
 import AppDialog from '../AppDialog'
+import InfoTip from '../InfoTip'
 import {
   presupuestosApi, soles, num,
   type ValorizacionResumen, type ValorizacionDetalle, type ValorizacionItemCalc,
@@ -39,6 +40,9 @@ export default function Valorizaciones({ presupuestoId }: { presupuestoId: strin
   const [savingId, setSavingId] = useState<string | null>(null)
   const [editId, setEditId] = useState<string | null>(null)
   const [editVal, setEditVal] = useState('')
+  // Condiciones de cobro del contrato (se guardan en la cabecera, afectan todas las valorizaciones)
+  const [adelInput, setAdelInput] = useState('0')
+  const [garInput, setGarInput] = useState('0')
 
   const cargarLista = useCallback(async () => {
     const l = await presupuestosApi.listarValorizaciones(presupuestoId)
@@ -58,6 +62,19 @@ export default function Valorizaciones({ presupuestoId }: { presupuestoId: strin
     setCargandoDet(true)
     presupuestosApi.getValorizacion(selId).then(setDetalle).finally(() => setCargandoDet(false))
   }, [selId])
+
+  // Sincroniza los inputs de % con lo guardado (fracción → %)
+  useEffect(() => {
+    if (!detalle) return
+    setAdelInput(String(+((detalle.totales.adelanto_pct ?? 0) * 100).toFixed(2)))
+    setGarInput(String(+((detalle.totales.fondo_garantia_pct ?? 0) * 100).toFixed(2)))
+  }, [detalle])
+
+  async function guardarDeduccion(campo: 'adelantoPct' | 'fondoGarantiaPct', valorPct: string) {
+    const frac = Math.min(1, Math.max(0, (Number(valorPct) || 0) / 100))
+    await presupuestosApi.actualizarDeducciones(presupuestoId, { [campo]: frac })
+    if (selId) setDetalle(await presupuestosApi.getValorizacion(selId))
+  }
 
   async function crear() {
     setCreando(true)
@@ -123,9 +140,43 @@ export default function Valorizaciones({ presupuestoId }: { presupuestoId: strin
           {/* KPIs del período */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <Kpi label="Avance global" value={`${num(detalle.totales.avance_global_pct, 1)}%`} sub="del presupuesto" />
-            <Kpi label="Costo directo del período" value={soles(detalle.totales.cd_periodo)} />
-            <Kpi label="A facturar este período" value={soles(detalle.totales.total_periodo)} accent sub="con GG, utilidad e IGV" />
-            <Kpi label="Facturado acumulado" value={soles(detalle.totales.total_acum)} sub="a la fecha" />
+            <Kpi label="Valorización bruta" value={soles(detalle.totales.total_periodo)} sub="del período, con IGV" />
+            <Kpi label="Neto a cobrar" value={soles(detalle.totales.neto_periodo)} accent sub="este período, tras deducciones" />
+            <Kpi label="Neto acumulado" value={soles(detalle.totales.neto_acum)} sub="a la fecha" />
+          </div>
+
+          {/* Condiciones de cobro del contrato (se descuentan de cada valorización) */}
+          <div className="flex items-center gap-x-6 gap-y-2 flex-wrap bg-white rounded-2xl border border-slate-200 px-4 py-3">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-semibold text-slate-600">Condiciones de cobro</span>
+              <InfoTip title="¿Qué se descuenta de la valorización?">
+                <p><b className="text-slate-700">Amortización del adelanto</b>: si el cliente te dio un adelanto (para caja o materiales), cada valorización devuelve una parte. Se descuenta ese % sobre el bruto del período.</p>
+                <p><b className="text-slate-700">Fondo de garantía</b> (retención): el cliente retiene un % de cada valorización como garantía y te lo devuelve en la liquidación final.</p>
+                <p><b className="text-slate-700">Neto a cobrar</b> = bruto − amortización − garantía. Ajusta los % a tu contrato.</p>
+              </InfoTip>
+            </div>
+            <label className="flex items-center gap-2 text-xs text-slate-500">
+              Adelanto amortizable
+              <span className="flex items-center">
+                <input type="number" min={0} max={100} step="0.1" value={adelInput}
+                  onChange={(e) => setAdelInput(e.target.value)}
+                  onBlur={() => guardarDeduccion('adelantoPct', adelInput)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                  className="w-16 border border-slate-200 rounded-lg px-2 py-1 text-sm text-right text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" />
+                <span className="ml-1 text-slate-400">%</span>
+              </span>
+            </label>
+            <label className="flex items-center gap-2 text-xs text-slate-500">
+              Fondo de garantía
+              <span className="flex items-center">
+                <input type="number" min={0} max={100} step="0.1" value={garInput}
+                  onChange={(e) => setGarInput(e.target.value)}
+                  onBlur={() => guardarDeduccion('fondoGarantiaPct', garInput)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                  className="w-16 border border-slate-200 rounded-lg px-2 py-1 text-sm text-right text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" />
+                <span className="ml-1 text-slate-400">%</span>
+              </span>
+            </label>
           </div>
 
           {/* Tabla de avance */}
@@ -187,10 +238,21 @@ export default function Valorizaciones({ presupuestoId }: { presupuestoId: strin
                 <Row label="Gastos generales" value={detalle.totales.gg_periodo} />
                 <Row label="Utilidad" value={detalle.totales.ut_periodo} />
                 <Row label="IGV" value={detalle.totales.igv_periodo} />
+                <div className="border-t border-slate-200 my-1" />
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-600">Valorización bruta del período</span>
+                  <span className="text-sm font-bold text-slate-700 tabular-nums">{soles(detalle.totales.total_periodo)}</span>
+                </div>
+                {detalle.totales.adelanto_pct > 0 && (
+                  <Row label={`− Amortización de adelanto (${num(detalle.totales.adelanto_pct * 100, 1)}%)`} value={-detalle.totales.amort_periodo} />
+                )}
+                {detalle.totales.fondo_garantia_pct > 0 && (
+                  <Row label={`− Fondo de garantía (${num(detalle.totales.fondo_garantia_pct * 100, 1)}%)`} value={-detalle.totales.retencion_periodo} />
+                )}
                 <div className="border-t-2 border-slate-300 my-1" />
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-bold text-slate-900">A FACTURAR ESTE PERÍODO</span>
-                  <span className="text-lg font-bold text-emerald-600 tabular-nums">{soles(detalle.totales.total_periodo)}</span>
+                  <span className="text-sm font-bold text-slate-900">NETO A COBRAR</span>
+                  <span className="text-lg font-bold text-emerald-600 tabular-nums">{soles(detalle.totales.neto_periodo)}</span>
                 </div>
               </div>
             </div>

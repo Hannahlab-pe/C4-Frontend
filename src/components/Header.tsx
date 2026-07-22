@@ -1,4 +1,4 @@
-import { Bell, Search, Menu } from 'lucide-react'
+import { Bell, Search, Menu, User } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 import { useUiStore } from '../store/uiStore'
 
@@ -46,10 +46,8 @@ export default function Header() {
         </button>
 
         <div className="flex items-center gap-2.5 pl-3 border-l border-white/10">
-          <div className="w-9 h-9 rounded-lg bg-linear-to-br from-blue-700 to-blue-500 flex items-center justify-center shrink-0">
-            <span className="text-white text-sm font-bold">
-              {user?.nombre?.charAt(0)?.toUpperCase() ?? 'U'}
-            </span>
+          <div className="w-9 h-9 rounded-lg bg-white/10 border border-white/10 flex items-center justify-center shrink-0">
+            <User className="w-5 h-5 text-slate-300" />
           </div>
           <div className="leading-tight hidden sm:block">
             <p className="text-[13px] font-semibold text-slate-100 truncate max-w-40">{user?.nombre ?? 'Usuario'}</p>

@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  ChevronLeft, Plus, Loader2, Trash2, RefreshCw, Lock, FolderPlus, ListPlus, Check, Download, Boxes,
+  ChevronLeft, Plus, Loader2, Trash2, RefreshCw, Lock, FolderPlus, ListPlus, Check, Download, Boxes, Library, Search,
 } from 'lucide-react'
 import AppDialog from '../AppDialog'
 import {
   presupuestosApi, soles, num, TIPO_PRESUP_META,
-  type ArbolResponse, type Partida, type PresupuestoItem,
+  type ArbolResponse, type Partida, type PresupuestoItem, type PartidaCatalogo,
+  type ApuResponse, type Recurso,
 } from '../../lib/presupuestos'
 import Valorizaciones from './Valorizaciones'
 
@@ -45,6 +46,8 @@ export default function PresupuestoTree({ presupuestoId, onBack }: { presupuesto
   // modal agregar
   const [addCtx, setAddCtx] = useState<{ parentId: string | null; parentLabel: string } | null>(null)
   const [prefabOpen, setPrefabOpen] = useState(false)
+  const [catalogoOpen, setCatalogoOpen] = useState(false)
+  const [detalle, setDetalle] = useState<PresupuestoItem | null>(null)
 
   const recargar = useCallback(() => presupuestosApi.arbol(presupuestoId).then(setArbol), [presupuestoId])
 
@@ -125,6 +128,12 @@ export default function PresupuestoTree({ presupuestoId, onBack }: { presupuesto
             <RefreshCw className={`w-4 h-4 ${recalculando ? 'animate-spin' : ''}`} /> Recalcular
           </button>
           {!congelado && (
+            <button onClick={() => setCatalogoOpen(true)} title="Buscar en la biblioteca de 8000 partidas (WBS) y agregarla al presupuesto"
+              className="flex items-center gap-2 border border-slate-200 text-slate-600 text-sm font-medium px-3 py-2 rounded-xl hover:bg-slate-50 transition-colors">
+              <Library className="w-4 h-4" /> Catálogo
+            </button>
+          )}
+          {!congelado && (
             <button onClick={() => setPrefabOpen(true)} title="Agregar un prefabricado Betondecken (prelosa / muro Doppel)"
               className="flex items-center gap-2 border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 text-sm font-medium px-3 py-2 rounded-xl transition-colors">
               <Boxes className="w-4 h-4" /> Prefabricado
@@ -168,7 +177,18 @@ export default function PresupuestoTree({ presupuestoId, onBack }: { presupuesto
                     <td className="px-4 py-2.5">
                       <div style={{ paddingLeft: depth * 20 }} className="flex items-center gap-2">
                         {item.codigo && <span className="font-mono text-[11px] text-slate-400 shrink-0">{item.codigo}</span>}
-                        <span className={esTitulo ? 'font-bold text-slate-800 uppercase text-[13px] tracking-wide' : 'text-slate-700'}>{item.descripcion || <span className="text-slate-400 italic">(sin nombre)</span>}</span>
+                        {esTitulo ? (
+                          <span className="font-bold text-slate-800 uppercase text-[13px] tracking-wide">{item.descripcion || <span className="text-slate-400 italic">(sin nombre)</span>}</span>
+                        ) : (
+                          <button onClick={() => setDetalle(item)} title="Ver detalle / editar P.U. / APU"
+                            className="text-left text-slate-700 hover:text-blue-600 hover:underline decoration-dotted underline-offset-4 transition-colors">
+                            {item.descripcion || <span className="text-slate-400 italic">(sin nombre)</span>}
+                          </button>
+                        )}
+                        {!esTitulo && !item.partidaId && (Number(item.costoUnitarioSnapshot ?? 0) > 0) && (
+                          <span title="P.U. referencial — precio manual, no viene de un APU (receta)"
+                            className="shrink-0 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-50 text-amber-600 border border-amber-200">P.U. ref.</span>
+                        )}
                       </div>
                     </td>
                     <td className="px-3 py-2.5 text-right tabular-nums">
@@ -245,7 +265,282 @@ export default function PresupuestoTree({ presupuestoId, onBack }: { presupuesto
           onDone={() => { setPrefabOpen(false); recargar() }}
         />
       )}
+
+      {catalogoOpen && arbol && (
+        <CatalogoDialog
+          titulos={arbol.items.filter((i) => i.tipo === 'titulo')}
+          presupuestoId={presupuestoId}
+          onClose={() => setCatalogoOpen(false)}
+          onDone={() => { setCatalogoOpen(false); recargar() }}
+        />
+      )}
+
+      {detalle && (
+        <PartidaDetalleDialog
+          item={detalle} partidas={partidas} congelado={!!congelado}
+          onClose={() => setDetalle(null)}
+          onChanged={() => { setDetalle(null); recargar() }}
+        />
+      )}
     </div>
+  )
+}
+
+// ── Modal: detalle de una partida (P.U. manual / APU / eliminar) ──
+function PartidaDetalleDialog({ item, partidas, congelado, onClose, onChanged }: {
+  item: PresupuestoItem; partidas: Partida[]; congelado: boolean; onClose: () => void; onChanged: () => void
+}) {
+  const partida = partidas.find((p) => p.id === item.partidaId)
+  const tieneApu = !!item.partidaId
+  const editablePU = !congelado && !tieneApu
+  const [apu, setApu] = useState<ApuResponse | null>(null)
+  const [recursos, setRecursos] = useState<Record<string, Recurso>>({})
+  const [pu, setPu] = useState(String(Number(item.costoUnitarioSnapshot ?? 0)))
+  const [guardando, setGuardando] = useState(false)
+  const [eliminando, setEliminando] = useState(false)
+  const inputCls = 'w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all'
+
+  useEffect(() => {
+    if (!item.partidaId) return
+    presupuestosApi.getApu(item.partidaId).then(setApu).catch(() => {})
+    presupuestosApi.listarRecursos().then((rs) => setRecursos(Object.fromEntries(rs.map((r) => [r.id, r])))).catch(() => {})
+  }, [item.partidaId])
+
+  const metrado = Number(item.metrado ?? 0)
+  const parcial = metrado * (Number(pu) || 0)
+
+  async function guardarPU() {
+    setGuardando(true)
+    try { await presupuestosApi.actualizarItem(item.id, { costoUnitarioSnapshot: String(Number(pu) || 0) }); onChanged() }
+    finally { setGuardando(false) }
+  }
+  async function eliminar() {
+    setEliminando(true)
+    try { await presupuestosApi.eliminarItem(item.id); onChanged() }
+    finally { setEliminando(false) }
+  }
+
+  return (
+    <AppDialog open onClose={onClose} title="Detalle de la partida">
+      <div className="flex items-start gap-2 mb-1">
+        {item.codigo && <span className="font-mono text-[11px] text-slate-400 mt-1 shrink-0">{item.codigo}</span>}
+        <p className="text-sm font-semibold text-slate-800">{item.descripcion || '(sin nombre)'}</p>
+      </div>
+      <p className="text-[11px] text-slate-400 mb-4">
+        {tieneApu ? 'Vinculada a una partida del catálogo (con APU).' : 'P.U. manual — estimada o importada (sin APU).'}
+        {partida?.unidad && <> · Unidad: <b className="text-slate-500">{partida.unidad}</b></>}
+      </p>
+
+      <div className="grid grid-cols-3 gap-3">
+        <Campo label="Metrado" value={`${num(metrado)} ${partida?.unidad ?? ''}`} />
+        {editablePU ? (
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1.5">P.U. (S/)</label>
+            <input type="number" step="0.01" value={pu} onChange={(e) => setPu(e.target.value)} className={inputCls} />
+          </div>
+        ) : (
+          <Campo label="P.U. (S/)" value={num(Number(item.costoUnitarioSnapshot ?? 0))} />
+        )}
+        <Campo label="Parcial" value={soles(parcial)} accent />
+      </div>
+
+      {tieneApu && (
+        <div className="mt-4">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Análisis de precios (APU)</p>
+          {!apu ? (
+            <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+          ) : apu.lineas.length === 0 ? (
+            <p className="text-xs text-slate-400">Aún no tiene APU. Ármalo en la pestaña <b>Partidas / APU</b>.</p>
+          ) : (
+            <div className="border border-slate-200 rounded-xl overflow-hidden">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-slate-400 text-[10px] uppercase tracking-wide border-b border-slate-100">
+                    <th className="text-left px-3 py-2 font-semibold">Recurso</th>
+                    <th className="text-right px-2 font-semibold">Cant.</th>
+                    <th className="text-right px-2 font-semibold">P.U.</th>
+                    <th className="text-right px-3 font-semibold">Parcial</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {apu.calculo.lineas.map((l, i) => (
+                    <tr key={i} className="border-b border-slate-50 last:border-0">
+                      <td className="px-3 py-1.5 text-slate-600">{recursos[l.refId]?.nombre ?? l.clase}</td>
+                      <td className="px-2 text-right tabular-nums text-slate-500">{num(l.cantidad, 3)}</td>
+                      <td className="px-2 text-right tabular-nums text-slate-500">{num(l.precioUnitario)}</td>
+                      <td className="px-3 text-right tabular-nums text-slate-700">{num(l.parcial)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="flex justify-between px-3 py-2 bg-slate-50 border-t border-slate-100 text-xs">
+                <span className="font-semibold text-slate-600">Costo unitario</span>
+                <span className="font-bold text-slate-800 tabular-nums">{soles(apu.calculo.costoUnitario)}</span>
+              </div>
+            </div>
+          )}
+          <p className="text-[11px] text-slate-400 mt-2">El P.U. sale del APU. Para cambiarlo, edita los precios en <b>Recursos</b> y usa <b>Recalcular</b>.</p>
+        </div>
+      )}
+
+      <div className="flex items-center gap-3 mt-6">
+        {!congelado && (
+          <button onClick={eliminar} disabled={eliminando}
+            className="flex items-center gap-1.5 text-sm font-medium text-red-500 border border-red-200 rounded-xl px-3 py-2.5 hover:bg-red-50 disabled:opacity-40 transition-colors">
+            {eliminando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-4 h-4" />} Eliminar
+          </button>
+        )}
+        <div className="flex-1" />
+        <button onClick={onClose} className="text-sm font-medium text-slate-600 border border-slate-200 rounded-xl px-4 py-2.5 hover:bg-slate-50 transition-colors">Cerrar</button>
+        {editablePU && (
+          <button onClick={guardarPU} disabled={guardando}
+            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition-colors">
+            {guardando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-4 h-4" />} Guardar P.U.
+          </button>
+        )}
+      </div>
+    </AppDialog>
+  )
+}
+
+function Campo({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+  return (
+    <div>
+      <p className="block text-xs font-medium text-slate-600 mb-1.5">{label}</p>
+      <div className={`px-3 py-2.5 text-sm rounded-xl border tabular-nums ${accent ? 'bg-blue-50 border-blue-100 text-blue-700 font-semibold' : 'bg-slate-50 border-slate-100 text-slate-700'}`}>{value}</div>
+    </div>
+  )
+}
+
+// ── Modal: buscar en la biblioteca WBS (8k partidas) y agregar con P.U. manual ──
+function CatalogoDialog({ titulos, presupuestoId, onClose, onDone }: {
+  titulos: PresupuestoItem[]; presupuestoId: string; onClose: () => void; onDone: () => void
+}) {
+  const [q, setQ] = useState('')
+  const [resultados, setResultados] = useState<PartidaCatalogo[]>([])
+  const [buscando, setBuscando] = useState(false)
+  const [sinResultados, setSinResultados] = useState(false)
+  const [sel, setSel] = useState<PartidaCatalogo | null>(null)
+  const [metrado, setMetrado] = useState('')
+  const [precio, setPrecio] = useState('')
+  const [parentId, setParentId] = useState('')
+  const [guardando, setGuardando] = useState(false)
+  const inputCls = 'w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all'
+
+  // Búsqueda con debounce (mín. 2 caracteres)
+  useEffect(() => {
+    const term = q.trim()
+    if (term.length < 2) { setResultados([]); setSinResultados(false); return }
+    setBuscando(true)
+    const t = setTimeout(() => {
+      presupuestosApi.buscarCatalogo(term)
+        .then((rs) => { setResultados(rs); setSinResultados(rs.length === 0) })
+        .catch(() => { setResultados([]); setSinResultados(true) })
+        .finally(() => setBuscando(false))
+    }, 300)
+    return () => clearTimeout(t)
+  }, [q])
+
+  const parcial = (Number(metrado) || 0) * (Number(precio) || 0)
+
+  async function agregar() {
+    if (!sel) return
+    setGuardando(true)
+    try {
+      await presupuestosApi.agregarDesdeCatalogo(presupuestoId, {
+        catalogoId: sel.id,
+        parentId: parentId || null,
+        metrado: Number(metrado) || 0,
+        precioUnitario: precio.trim() === '' ? undefined : Number(precio) || 0,
+      })
+      onDone()
+    } finally { setGuardando(false) }
+  }
+
+  return (
+    <AppDialog open onClose={onClose} title="Buscar en la biblioteca de partidas">
+      <p className="text-xs text-slate-500 mb-3">
+        Busca entre las <b>~8000 partidas</b> del catálogo (WBS). El catálogo no trae precio, así que le
+        pones el <b>P.U.</b> tú — o lo dejas en blanco y le armas el APU después en <b>Partidas / APU</b>.
+      </p>
+
+      {/* Buscador */}
+      <div className="flex items-center gap-2.5 w-full bg-white rounded-xl px-3.5 py-2.5 border border-slate-200 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition-all mb-3">
+        {buscando ? <Loader2 className="w-4 h-4 text-slate-400 animate-spin shrink-0" /> : <Search className="w-4 h-4 text-slate-400 shrink-0" />}
+        <input autoFocus value={q} onChange={(e) => { setQ(e.target.value); setSel(null) }}
+          placeholder="Ej. concreto, encofrado, tarrajeo, excavación…"
+          className="bg-transparent text-sm text-slate-700 placeholder:text-slate-400 outline-none w-full" />
+      </div>
+
+      {/* Resultados */}
+      {!sel && (
+        <div className="max-h-64 overflow-y-auto -mx-1 px-1">
+          {q.trim().length < 2 && <p className="text-xs text-slate-400 py-6 text-center">Escribe al menos 2 letras para buscar.</p>}
+          {q.trim().length >= 2 && sinResultados && !buscando && <p className="text-xs text-slate-400 py-6 text-center">Sin resultados para “{q.trim()}”.</p>}
+          <div className="space-y-1.5">
+            {resultados.map((c) => (
+              <button key={c.id} onClick={() => { setSel(c); setPrecio(''); setMetrado('') }}
+                className="w-full text-left border border-slate-200 rounded-xl px-3 py-2.5 hover:bg-slate-50 hover:border-slate-300 transition-colors">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-[11px] text-slate-400 shrink-0">{c.codigo}</span>
+                  <span className="text-sm font-medium text-slate-800 truncate">{c.partida}</span>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-0.5 truncate">
+                  {c.unidad && <span className="font-semibold text-slate-500">{c.unidad}</span>}
+                  {c.especialidad && <> · {c.especialidad}</>}
+                  {c.fase && <> · {c.fase}</>}
+                </p>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Partida elegida → metrado + P.U. + destino */}
+      {sel && (
+        <div className="border border-blue-200 bg-blue-50/40 rounded-xl p-3.5">
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-[11px] text-slate-400 shrink-0">{sel.codigo}</span>
+                <span className="text-sm font-semibold text-slate-800">{sel.partida}</span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-0.5">Unidad: <b className="text-slate-500">{sel.unidad || 's/u'}</b>{sel.especialidad && <> · {sel.especialidad}</>}</p>
+            </div>
+            <button onClick={() => setSel(null)} className="text-xs font-medium text-blue-600 hover:underline shrink-0">Cambiar</button>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1.5">Metrado</label>
+              <input type="number" step="0.0001" value={metrado} onChange={(e) => setMetrado(e.target.value)} placeholder="0" className={inputCls} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1.5">P.U. (S/) <span className="text-slate-400 font-normal">opcional</span></label>
+              <input type="number" step="0.01" value={precio} onChange={(e) => setPrecio(e.target.value)} placeholder="0.00" className={inputCls} />
+            </div>
+          </div>
+          <div className="mt-3">
+            <label className="block text-xs font-medium text-slate-600 mb-1.5">Dentro de</label>
+            <select value={parentId} onChange={(e) => setParentId(e.target.value)} className={inputCls}>
+              <option value="">Nivel raíz</option>
+              {titulos.map((t) => <option key={t.id} value={t.id}>{t.descripcion || t.codigo}</option>)}
+            </select>
+          </div>
+          <div className="flex items-center justify-between mt-3 pt-3 border-t border-blue-100">
+            <span className="text-xs text-slate-500">Parcial</span>
+            <span className="text-sm font-bold text-slate-800 tabular-nums">{soles(parcial)}</span>
+          </div>
+        </div>
+      )}
+
+      <div className="flex gap-3 mt-6">
+        <button onClick={onClose} className="flex-1 border border-slate-200 text-slate-600 text-sm font-medium py-2.5 rounded-xl hover:bg-slate-50 transition-colors">Cancelar</button>
+        <button onClick={agregar} disabled={guardando || !sel}
+          className="flex-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-sm font-medium py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2">
+          {guardando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-4 h-4" />} Agregar al presupuesto
+        </button>
+      </div>
+    </AppDialog>
   )
 }
 

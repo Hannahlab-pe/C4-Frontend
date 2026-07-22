@@ -28,6 +28,20 @@ export interface Partida {
   proyectoId?: string | null
 }
 
+/** Partida de la biblioteca maestra WBS (partidas_catalogo, ~8k). Es taxonomía: sin precio. */
+export interface PartidaCatalogo {
+  id: string
+  codigo: string
+  capitulo: string
+  subcapitulo: string
+  sistema: string
+  partida: string
+  tipo: string
+  unidad: string
+  especialidad: string
+  fase: string
+}
+
 export interface ApuLinea {
   id?: string
   partidaId?: string
@@ -70,6 +84,8 @@ export interface Presupuesto {
   ggPorcentaje: string
   utilidadPorcentaje: string
   igvPorcentaje: string
+  adelantoPct?: string
+  fondoGarantiaPct?: string
   congelado: boolean
   origenId?: string | null
   createdAt?: string
@@ -98,6 +114,7 @@ export interface ItemInput {
   codigo?: string
   descripcion?: string
   metrado?: number
+  costoUnitarioSnapshot?: string // P.U. manual (para partidas sin APU: estimadas/importadas/del plano)
 }
 
 export interface ArbolResponse {
@@ -141,6 +158,10 @@ export interface ValorizacionDetalle {
   totales: {
     cd_periodo: number; gg_periodo: number; ut_periodo: number; igv_periodo: number; total_periodo: number
     cd_acum: number; total_acum: number; avance_global_pct: number
+    // Deducciones del contrato → neto a cobrar
+    adelanto_pct: number; fondo_garantia_pct: number
+    amort_periodo: number; retencion_periodo: number; neto_periodo: number
+    amort_acum: number; retencion_acum: number; neto_acum: number
   }
 }
 
@@ -211,8 +232,16 @@ export const presupuestosApi = {
     api.post<ArbolResponse>(`/presupuestos/${id}/recalcular`).then((r) => r.data),
   duplicar: (id: string, tipo: 'venta' | 'linea_base', nombre?: string) =>
     api.post<ArbolResponse>(`/presupuestos/${id}/duplicar`, { tipo, nombre }).then((r) => r.data),
+  actualizarDeducciones: (id: string, dto: { adelantoPct?: number; fondoGarantiaPct?: number }) =>
+    api.patch<Presupuesto>(`/presupuestos/${id}/deducciones`, dto).then((r) => r.data),
   crearItem: (id: string, dto: ItemInput) =>
     api.post<PresupuestoItem>(`/presupuestos/${id}/items`, dto).then((r) => r.data),
+
+  // Biblioteca WBS (8k partidas) → presupuesto
+  buscarCatalogo: (q: string, opts?: { fase?: string; especialidad?: string }) =>
+    api.get<PartidaCatalogo[]>('/partidas-catalogo/buscar', { params: { q, ...opts } }).then((r) => r.data),
+  agregarDesdeCatalogo: (id: string, dto: { catalogoId: string; parentId?: string | null; metrado?: number; precioUnitario?: number }) =>
+    api.post<ArbolResponse>(`/presupuestos/${id}/items-catalogo`, dto).then((r) => r.data),
   actualizarItem: (itemId: string, dto: ItemInput) =>
     api.patch<PresupuestoItem>(`/presupuestos/items/${itemId}`, dto).then((r) => r.data),
   eliminarItem: (itemId: string) =>
