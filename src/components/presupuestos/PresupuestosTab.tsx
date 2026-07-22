@@ -1,12 +1,12 @@
-import { useEffect, useState } from 'react'
-import { Plus, Loader2, FileText, Lock, ChevronRight, Building2, CalendarDays, FileUp } from 'lucide-react'
+import { useEffect, useRef, useState, type ChangeEvent } from 'react'
+import { Plus, Loader2, FileText, Lock, ChevronRight, Building2, CalendarDays, FileUp, Ruler, Check } from 'lucide-react'
 import api from '../../lib/api'
 import AppDialog from '../AppDialog'
 import PresupuestoTree from './PresupuestoTree'
 import ImportarExcel from './ImportarExcel'
 import {
-  presupuestosApi, TIPO_PRESUP_META,
-  type Presupuesto, type TipoPresupuesto,
+  presupuestosApi, TIPO_PRESUP_META, num, soles,
+  type Presupuesto, type TipoPresupuesto, type MetradoDxfResp,
 } from '../../lib/presupuestos'
 
 interface Proyecto { id: string; nombre: string; distrito?: string }
@@ -25,6 +25,7 @@ export default function PresupuestosTab({ proyectoId: fixed }: { proyectoId?: st
   const [abierto, setAbierto] = useState<string | null>(null)
   const [importando, setImportando] = useState(false)
   const [showModal, setShowModal] = useState(false)
+  const [showDxf, setShowDxf] = useState(false)
 
   // form
   const [nombre, setNombre] = useState('')
@@ -86,6 +87,10 @@ export default function PresupuestosTab({ proyectoId: fixed }: { proyectoId?: st
           </div>
         )}
         <div className="flex items-center gap-2">
+          <button onClick={() => setShowDxf(true)} disabled={!proyectoId} title="Subir un plano DXF y armar el presupuesto midiendo sus áreas"
+            className="flex items-center gap-2 border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 text-sm font-medium px-4 py-2.5 rounded-xl disabled:opacity-40 transition-colors">
+            <Ruler className="w-4 h-4" /> Desde plano (DXF)
+          </button>
           <button onClick={() => setImportando(true)} disabled={!proyectoId}
             className="flex items-center gap-2 border border-slate-200 text-slate-600 text-sm font-medium px-4 py-2.5 rounded-xl hover:bg-slate-50 disabled:opacity-40 transition-colors">
             <FileUp className="w-4 h-4" /> Importar Excel
@@ -161,7 +166,170 @@ export default function PresupuestosTab({ proyectoId: fixed }: { proyectoId?: st
           </button>
         </div>
       </AppDialog>
+
+      {showDxf && proyectoId && (
+        <DesdeDxfDialog
+          proyectoId={proyectoId}
+          onClose={() => setShowDxf(false)}
+          onDone={(id) => { setShowDxf(false); cargarPresupuestos(proyectoId); setAbierto(id) }}
+        />
+      )}
     </div>
+  )
+}
+
+// ── Modal: subir un plano DXF → medir áreas → armar presupuesto estimado ──
+function DesdeDxfDialog({ proyectoId, onClose, onDone }: {
+  proyectoId: string; onClose: () => void; onDone: (id: string) => void
+}) {
+  const [midiendo, setMidiendo] = useState(false)
+  const [resp, setResp] = useState<MetradoDxfResp | null>(null)
+  const [filas, setFilas] = useState<Array<{ capa: string; area: number; partida: string; pu: string; incluir: boolean; esDetalle: boolean }>>([])
+  const [verDetalles, setVerDetalles] = useState(false)
+  const [nombre, setNombre] = useState('')
+  const [creando, setCreando] = useState(false)
+  const [error, setError] = useState('')
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  function toBase64(file: File): Promise<string> {
+    return new Promise((res, rej) => {
+      const r = new FileReader()
+      r.onload = () => res((r.result as string).split(',')[1])
+      r.onerror = rej
+      r.readAsDataURL(file)
+    })
+  }
+
+  async function onFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setNombre(`Estimado desde plano — ${file.name.replace(/\.dxf$/i, '')}`)
+    setMidiendo(true); setError('')
+    try {
+      const b64 = await toBase64(file)
+      const r = await presupuestosApi.metradoDxf(b64)
+      setResp(r)
+      setFilas(r.capas.filter((c) => c.partida_sugerida).map((c) => ({
+        capa: c.capa, area: c.area_m2, partida: c.partida_sugerida as string, pu: '',
+        incluir: !c.es_detalle, esDetalle: c.es_detalle,
+      })))
+    } catch {
+      setError('No pude medir el DXF. ¿Es un archivo DXF válido? (el DWG binario no sirve)')
+    } finally { setMidiendo(false) }
+  }
+
+  const incluidas = filas.filter((f) => f.incluir)
+  const totalCD = incluidas.reduce((s, f) => s + f.area * (Number(f.pu) || 0), 0)
+  const detalleCount = filas.filter((f) => f.esDetalle).length
+  const setFila = (i: number, patch: Partial<typeof filas[number]>) =>
+    setFilas((fs) => fs.map((f, j) => (j === i ? { ...f, ...patch } : f)))
+
+  const renderRow = (f: typeof filas[number], i: number) => (
+    <tr key={i} className={`border-t border-slate-50 ${f.incluir ? '' : 'opacity-40'}`}>
+      <td className="px-2 py-1.5 text-center">
+        <input type="checkbox" checked={f.incluir} onChange={(e) => setFila(i, { incluir: e.target.checked })} className="accent-blue-600" />
+      </td>
+      <td className="px-2 py-1.5">
+        <input value={f.partida} onChange={(e) => setFila(i, { partida: e.target.value })}
+          className="w-full text-sm text-slate-700 bg-transparent outline-none" />
+        <span className="font-mono text-[10px] text-slate-400">{f.capa}</span>
+      </td>
+      <td className="px-2 py-1.5 text-right tabular-nums text-slate-500">{num(f.area, 1)}</td>
+      <td className="px-2 py-1.5 text-right">
+        <input type="number" step="0.01" value={f.pu} onChange={(e) => setFila(i, { pu: e.target.value })}
+          placeholder="0" className="w-20 text-right text-sm border border-slate-200 rounded-lg px-2 py-1 outline-none focus:border-blue-400 tabular-nums" />
+      </td>
+    </tr>
+  )
+
+  async function crear() {
+    setCreando(true)
+    try {
+      const arbol = await presupuestosApi.crearEstimado({
+        proyectoId, nombre: nombre.trim() || 'Estimado desde plano DXF',
+        ggPorcentaje: 0.1, utilidadPorcentaje: 0.08, igvPorcentaje: 0.18,
+        partidas: incluidas.map((f) => ({
+          capitulo: 'ESTRUCTURAS', descripcion: f.partida, unidad: 'm2',
+          metrado: f.area, precio: Number(f.pu) || 0,
+        })),
+      })
+      onDone(arbol.presupuesto.id)
+    } finally { setCreando(false) }
+  }
+
+  return (
+    <AppDialog open onClose={onClose} title="Presupuesto desde plano (DXF)" size="xl">
+      {!resp ? (
+        <div className="text-center py-6">
+          <p className="text-sm text-slate-500 mb-4 max-w-md mx-auto">
+            Sube el <b>DXF de estructuras</b>. C4 mide las áreas por capa y arma un borrador de partidas.
+            El <b>metrado sale del plano</b>; el precio lo pones tú.
+          </p>
+          <input ref={fileRef} type="file" accept=".dxf" className="hidden" onChange={onFile} />
+          <button onClick={() => fileRef.current?.click()} disabled={midiendo}
+            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-sm font-medium px-5 py-3 rounded-xl transition-colors">
+            {midiendo ? <Loader2 className="w-4 h-4 animate-spin" /> : <Ruler className="w-4 h-4" />}
+            {midiendo ? 'Midiendo el plano…' : 'Elegir DXF'}
+          </button>
+          {error && <p className="text-xs text-red-500 mt-3">{error}</p>}
+        </div>
+      ) : (
+        <>
+          <p className="text-xs text-slate-500 mb-3">
+            Escala detectada: <b className="text-slate-700">{resp.unidad_detectada}</b>
+            {resp.escala_confianza === 'alta' ? ' (confirmada por las cotas)' : ' (asumida)'}.
+            Revisa las partidas, pon el <b>P.U.</b> y <b>desmarca</b> las que se repitan.
+          </p>
+          <div className="max-h-64 overflow-y-auto border border-slate-200 rounded-xl">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-slate-50 z-10">
+                <tr className="text-[10px] uppercase tracking-wide text-slate-400">
+                  <th className="px-2 py-2 w-8"></th>
+                  <th className="text-left px-2 py-2">Partida · capa</th>
+                  <th className="text-right px-2 py-2 w-20">m²</th>
+                  <th className="text-right px-2 py-2 w-24">P.U. (S/)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filas.map((f, i) => (!f.esDetalle ? renderRow(f, i) : null))}
+                {detalleCount > 0 && (
+                  <tr>
+                    <td colSpan={4} className="px-2 py-2 border-t border-slate-100">
+                      <button onClick={() => setVerDetalles((v) => !v)} className="text-xs font-medium text-blue-600 hover:underline">
+                        {verDetalles ? '− Ocultar' : `+ Ver ${detalleCount}`} capas menores / de detalle
+                      </button>
+                    </td>
+                  </tr>
+                )}
+                {verDetalles && filas.map((f, i) => (f.esDetalle ? renderRow(f, i) : null))}
+                {filas.length === 0 && (
+                  <tr><td colSpan={4} className="px-3 py-6 text-center text-xs text-slate-400">No detecté capas con partida reconocible. Revisa que el DXF tenga capas por elemento (muros, losas, cimentación).</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex items-center gap-3 mt-3">
+            <input value={nombre} onChange={(e) => setNombre(e.target.value)}
+              placeholder="Nombre del presupuesto"
+              className="flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-blue-400" />
+            <div className="text-right shrink-0">
+              <span className="text-[11px] text-slate-400">Costo directo</span>
+              <p className="text-sm font-bold text-slate-800 tabular-nums leading-tight">{soles(totalCD)}</p>
+            </div>
+          </div>
+          <div className="flex gap-3 mt-5">
+            <button onClick={onClose} className="flex-1 border border-slate-200 text-slate-600 text-sm font-medium py-2.5 rounded-xl hover:bg-slate-50 transition-colors">Cancelar</button>
+            <button onClick={crear} disabled={creando || incluidas.length === 0}
+              className="flex-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-sm font-medium py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2">
+              {creando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-4 h-4" />} Crear presupuesto
+            </button>
+          </div>
+          <p className="text-[11px] text-amber-600 mt-3">
+            Borrador: el metrado sale del plano (áreas aproximadas), el P.U. es referencial y faltan acabados. El ingeniero verifica.
+          </p>
+        </>
+      )}
+    </AppDialog>
   )
 }
 

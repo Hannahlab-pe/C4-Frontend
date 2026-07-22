@@ -28,6 +28,25 @@ export interface Partida {
   proyectoId?: string | null
 }
 
+/** Una capa del DXF con su área medida (para el flujo "subir plano → presupuesto"). */
+export interface MetradoDxfCapa {
+  capa: string
+  area_m2: number
+  n_cerradas: number
+  n_hatch: number
+  partida_sugerida: string | null
+  es_detalle: boolean
+}
+export interface MetradoDxfResp {
+  ok: boolean
+  unidad_detectada: string
+  factor_a_metros: number
+  escala_confianza: string
+  capas: MetradoDxfCapa[]
+  textos_clave: string[]
+  total_entidades: number
+}
+
 /** Partida de la biblioteca maestra WBS (partidas_catalogo, ~8k). Es taxonomía: sin precio. */
 export interface PartidaCatalogo {
   id: string
@@ -236,6 +255,14 @@ export const presupuestosApi = {
     api.patch<Presupuesto>(`/presupuestos/${id}/deducciones`, dto).then((r) => r.data),
   crearItem: (id: string, dto: ItemInput) =>
     api.post<PresupuestoItem>(`/presupuestos/${id}/items`, dto).then((r) => r.data),
+
+  // Plano DXF → presupuesto
+  metradoDxf: (dxfBase64: string) =>
+    api.post<MetradoDxfResp>('/presupuestos/metrado-dxf', { dxfBase64 }).then((r) => r.data),
+  crearEstimado: (dto: {
+    proyectoId: string; nombre?: string; ggPorcentaje?: number; utilidadPorcentaje?: number; igvPorcentaje?: number
+    partidas: Array<{ capitulo?: string; descripcion: string; unidad?: string; metrado?: number; precio?: number }>
+  }) => api.post<ArbolResponse>('/presupuestos/estimado', dto).then((r) => r.data),
 
   // Biblioteca WBS (8k partidas) → presupuesto
   buscarCatalogo: (q: string, opts?: { fase?: string; especialidad?: string }) =>
